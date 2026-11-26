@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Танковый турнир</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0f0a; --panel:#1a1d15; --panel2:#232819; --line:#3a4230; --steel:#4b5440;
+  --text:#ece9d8; --muted:#9c9d86; --accent:#f2b01e; --accent2:#c98a0c;
+  --win:#7bd35f; --lose:#ff5a3c; --pend:#86b6ea;
+  --gold:#f5c542; --silver:#c9d1d9; --bronze:#d08a4b;
+}
+*{box-sizing:border-box}
+body{margin:0;color:var(--text);font:15px/1.45 Rubik,system-ui,sans-serif;min-height:100vh;
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(ellipse 60% 40% at 15% 20%, rgba(74,86,48,.35), transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 10%, rgba(92,74,40,.30), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 70% 80%, rgba(52,64,36,.35), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 20% 85%, rgba(70,58,34,.30), transparent 70%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.012) 0 2px, transparent 2px 6px);
+  background-attachment:fixed}
+.wrap{max-width:1100px;margin:0 auto;padding:16px 16px 60px}
+h1,h2,h3,.stencil{font-family:"Russo One",Rubik,sans-serif;font-weight:400;margin:0;text-transform:uppercase;letter-spacing:1px}
+h2{font-size:18px;margin:28px 0 12px;display:flex;align-items:center;gap:10px;color:var(--accent)}
+h2::after{content:"";flex:1;height:2px;background:linear-gradient(90deg,var(--accent),transparent)}
+
+.hazard{height:10px;background:repeating-linear-gradient(-45deg,var(--accent) 0 14px,#16140c 14px 28px);border-radius:3px}
+.armor{position:relative;background:linear-gradient(180deg,#252a1c,#1a1d14);border:1px solid var(--line);border-radius:10px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 -2px 0 rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.45)}
+.armor::before,.armor::after{content:"";position:absolute;top:8px;width:7px;height:7px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#8d9479,#3a3f30 70%);box-shadow:0 1px 1px rgba(0,0,0,.6)}
+.armor::before{left:8px}.armor::after{right:8px}
+
+/* hero */
+.hero{padding:22px 24px 18px;margin-bottom:6px;overflow:hidden}
+.hero .kicker{font-family:"Russo One";color:var(--muted);font-size:12px;letter-spacing:3px;text-transform:uppercase}
+.hero h1{font-size:clamp(26px,5vw,44px);color:var(--text);text-shadow:0 2px 0 #000,0 0 24px rgba(242,176,30,.25);margin:4px 0 10px}
+.hero h1 span{color:var(--accent)}
+.hero .meta{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:12px;padding:3px 10px;border-radius:99px;background:#2d3322;border:1px solid var(--line);color:var(--muted)}
+.chip b{color:var(--text)}
+.hero svg.tank{position:absolute;right:-10px;bottom:-6px;width:240px;opacity:.10;pointer-events:none}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px}
+
+button,.btn{background:linear-gradient(180deg,#2e3423,#232819);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer;transition:border-color .15s,transform .05s}
+button:hover{border-color:var(--accent)}
+button:active{transform:translateY(1px)}
+button.primary{background:linear-gradient(180deg,#f7c040,#d4920e);color:#1a1405;border-color:#f7c040;font-family:"Russo One";text-transform:uppercase;letter-spacing:.5px;box-shadow:0 3px 0 #7a5306}
+button.primary:hover{filter:brightness(1.08)}
+button.danger{color:var(--lose)}
+button.small{padding:4px 10px;font-size:13px}
+input,select,textarea{background:#0b0d08;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(242,176,30,.15)}
+input[type=number]{width:100%;max-width:140px;font-variant-numeric:tabular-nums;font-weight:600}
+input:disabled,select:disabled{opacity:.85}
+.muted{color:var(--muted)}
+.banner{background:#16222e;border:1px solid #2f4a63;color:#cfe2f5;padding:10px 14px;border-radius:10px;margin-bottom:14px}
+
+/* podium */
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;gap:12px;margin-bottom:14px}
+.pod{text-align:center;padding:18px 10px 0;overflow:hidden}
+.pod .medal{font-size:34px;line-height:1}
+.pod .nm{font-family:"Russo One";font-size:18px;margin:6px 0 2px;word-break:break-word}
+.pod .sc{font-family:"Russo One";font-size:26px}
+.pod .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.pod .base{margin:12px -10px 0;font-family:"Russo One";font-size:26px;line-height:1;color:rgba(0,0,0,.35);padding:8px 0;box-sizing:border-box}
+.pod.g{border-color:var(--gold);box-shadow:0 0 28px rgba(245,197,66,.18),0 6px 18px rgba(0,0,0,.45)}
+.pod.g .sc{color:var(--gold)} .pod.g .base{background:linear-gradient(180deg,#f5c542,#b8860b);height:90px}
+.pod.s .sc{color:var(--silver)} .pod.s .base{background:linear-gradient(180deg,#c9d1d9,#7d8590);height:60px}
+.pod.b .sc{color:var(--bronze)} .pod.b .base{background:linear-gradient(180deg,#d08a4b,#8a5322);height:40px}
+
+/* leaderboard table */
+.ltable{overflow:hidden}
+.lt-row{display:grid;grid-template-columns:56px 1fr 110px 110px 90px 130px;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid #2a3021}
+.lt-row:last-child{border-bottom:none}
+.lt-row.head{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;background:rgba(0,0,0,.25);padding-top:16px}
+.lt-row .rk{font-family:"Russo One";font-size:20px;text-align:center;width:40px;height:40px;line-height:38px;border-radius:8px;background:#2a3021;border:1px solid var(--line)}
+.lt-row.r1 .rk{background:var(--gold);color:#2a1d00;border-color:var(--gold)}
+.lt-row.r2 .rk{background:var(--silver);color:#1b1f24;border-color:var(--silver)}
+.lt-row.r3 .rk{background:var(--bronze);color:#2a1505;border-color:var(--bronze)}
+.lt-row .nm{font-weight:700;font-size:17px}
+.lt-row .num{text-align:right;font-variant-numeric:tabular-nums}
+.lt-row .tot{font-family:"Russo One";font-size:22px;text-align:right;color:var(--accent)}
+.bar{height:4px;background:#2a3021;border-radius:2px;margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+.betdots{display:inline-flex;gap:3px;vertical-align:middle}
+.betdots i{width:9px;height:9px;border-radius:2px;background:var(--accent);display:inline-block}
+.betdots i.u{background:#3a4230}
+
+/* tabs */
+.tabs{display:flex;gap:4px;margin:30px 0 14px;border-bottom:2px solid var(--line)}
+.tab{background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;border-radius:0;padding:10px 16px;color:var(--muted);font-family:"Russo One";font-size:15px;text-transform:uppercase;letter-spacing:1px;box-shadow:none}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:hover{color:var(--text)}
+
+/* rounds */
+.rules{font-size:13px;color:var(--muted);background:rgba(0,0,0,.25);border-left:3px solid var(--accent);padding:8px 12px;border-radius:0 6px 6px 0}
+.rounds{display:grid;gap:14px}
+.round{overflow:hidden}
+.rhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 16px 12px 24px;background:linear-gradient(90deg,#2e3523,#20251a);border-bottom:1px solid var(--line)}
+.rhead h3{font-size:16px;margin-right:auto;color:var(--accent)}
+.prow{display:grid;grid-template-columns:minmax(110px,1.3fr) 90px minmax(90px,1fr) 110px minmax(120px,1.2fr);gap:10px;align-items:center;padding:9px 16px;border-bottom:1px solid #262b20}
+.prow:last-child{border-bottom:none}
+.prow.s2{grid-template-columns:minmax(110px,1.3fr) minmax(90px,1fr) 110px minmax(120px,1.2fr)}
+.prow.head{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding-top:7px;padding-bottom:7px;background:rgba(0,0,0,.2)}
+.pname{font-weight:600}
+.tag{display:inline-block;font-family:Rubik;font-size:11px;padding:1px 8px;border-radius:99px;background:#3a3215;color:var(--accent);margin-left:6px;vertical-align:middle;text-transform:none;letter-spacing:0}
+.pts{text-align:right;font-variant-numeric:tabular-nums}
+.pts b{font-size:18px;font-family:"Russo One";font-weight:400}
+.pts .calc{display:block;font-size:12px;color:var(--muted)}
+.bet{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none}
+.bet input{width:18px;height:18px;accent-color:var(--accent)}
+.bet.off{opacity:.35;cursor:not-allowed}
+.win{color:var(--win)} .lose{color:var(--lose)} .pend{color:var(--pend)}
+
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:12px 0 16px}
+.cat{padding:10px 12px 10px 22px;font-size:14px;font-weight:600}
+.cat::before,.cat::after{display:none}
+.cat{border-left:4px solid var(--accent)}
+.cat.done{opacity:.45;border-left-color:var(--steel)}
+.cat .cnt{float:right;color:var(--accent);font-family:"Russo One"}
+.cat .who{display:block;font-size:12px;color:var(--muted);margin-top:3px;font-weight:400}
+
+/* setup */
+.setup{max-width:580px;margin:30px auto;display:grid;gap:16px;padding:26px}
+.setup h1{font-size:28px;color:var(--accent)}
+.setup label{display:grid;gap:6px;font-weight:600}
+.plist{display:grid;gap:8px}
+.plist .pi{display:grid;grid-template-columns:34px 1fr 36px;gap:8px;align-items:center}
+.plist .pi span{font-family:"Russo One";text-align:center;color:var(--accent)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.empty{padding:28px;text-align:center;color:var(--muted);border:2px dashed var(--line);border-radius:12px}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--accent);color:#1a1405;padding:10px 18px;border-radius:10px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+.sync{position:fixed;right:12px;bottom:12px;z-index:5;font-size:12px;padding:6px 12px;border-radius:99px;background:#1a1d15;border:1px solid var(--line);color:var(--muted);box-shadow:0 4px 12px rgba(0,0,0,.5)}
+.sync.err,.sync.auth{color:var(--lose);border-color:var(--lose);cursor:pointer}
+.sync.ok{color:var(--win)}
+.sync.live{color:#ff6b57}
+.chip.live{color:#fff;background:#b3261e;border-color:#e0453a;animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.55}}
+
+@media (max-width:760px){
+  .lt-row{grid-template-columns:46px 1fr auto;}
+  .lt-row .hide-m{display:none}
+  .podium{gap:6px}
+  .pod .nm{font-size:14px} .pod .sc{font-size:18px} .pod .medal{font-size:26px}
+}
+@media (max-width:700px){
+  .prow,.prow.s2{grid-template-columns:1fr 1fr;gap:8px}
+  .prow.head{display:none}
+  .prow .pname{grid-column:1/-1}
+  .pts{grid-column:1/-1;text-align:left}
+  input[type=number]{max-width:none}
+  .row2{grid-template-columns:1fr}
+  .hero svg.tank{width:160px}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="toast" id="toast"></div>
+<div class="sync" id="sync" hidden></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script>
+const KEY = 'tank-tourney-v1';
+const LEVELS = [3,4,5,6,7,8,9,10];
+let S = null;        // state
+let VIEW = false;    // read-only viewer mode
+let TAB = 1;
+let EDITING = false; // setup form open for existing tournament
+
+const uid = () => Math.random().toString(36).slice(2, 9);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { if (v === '' || v == null) return null; const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
+const fmt = n => Math.round(n).toLocaleString('ru-RU');
+const $ = s => document.querySelector(s);
+
+function defaultCats(n) {
+  return [
+    {id:'sth', name:'Сверхтяж', slots:1},
+    {id:'tt',  name:'ТТ',       slots:1},
+    {id:'st',  name:'СТ',       slots:1},
+    {id:'art', name:'Арта',     slots:n, unique:true},
+    {id:'lt',  name:'ЛТ',       slots:n, unique:true},
+    {id:'pt',  name:'ПТ',       slots:1},
+    {id:'bt7', name:'БТ-7 арт.',slots:1},
+    {id:'kv2', name:'КВ-2',     slots:1},
+  ];
+}
+
+const AKEY = 'tank-tourney-admin-key';
+let API_OK = false, pushT = null, lastRemote = '';
+function save() {
+  if (VIEW) return;
+  if (S) S.updatedAt = Date.now();
+  try { S ? localStorage.setItem(KEY, JSON.stringify(S)) : localStorage.removeItem(KEY); } catch (e) {}
+  if (API_OK) { clearTimeout(pushT); setSync('wait'); pushT = setTimeout(push, 600); }
+}
+function adminKey(ask) {
+  let k = null; try { k = localStorage.getItem(AKEY); } catch (e) {}
+  if (!k || ask) {
+    k = prompt('Пароль ведущего (ADMIN_KEY из настроек Vercel):', '') || '';
+    try { localStorage.setItem(AKEY, k); } catch (e) {}
+  }
+  return k;
+}
+async function push() {
+  try {
+    const r = await fetch('/api/state', {method: 'POST', headers: {'Content-Type': 'application/json', 'x-admin-key': adminKey()}, body: JSON.stringify({state: S})});
+    if (r.status === 401) { try { localStorage.removeItem(AKEY); } catch (e) {} return setSync('auth'); }
+    setSync(r.ok ? 'ok' : 'err');
+  } catch (e) { setSync('err'); }
+}
+function setSync(st) {
+  const el = $('#sync'); if (!el) return;
+  const t = {ok: '☁️ Зрители видят актуальное', wait: '⏳ Отправка…', err: '⚠️ Нет связи — нажми, чтобы повторить', auth: '🔒 Неверный пароль — нажми, чтобы ввести', live: '🔴 LIVE · обновляется автоматически', off: '💾 Только локально (нет сервера)'}[st];
+  el.textContent = t; el.className = 'sync ' + st; el.hidden = false;
+}
+async function fetchRemote() {
+  const r = await fetch('/api/state', {cache: 'no-store'});
+  if (!r.ok) throw new Error(r.status);
+  return (await r.json()).state;
+}
+function startPolling() {
+  setInterval(async () => {
+    try {
+      const st = await fetchRemote(); const str = JSON.stringify(st);
+      setSync('live');
+      if (str !== lastRemote) { lastRemote = str; S = ensureStage1(st); render(); }
+    } catch (e) { setSync('err'); }
+  }, 4000);
+}
+function loadLocal() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 1800); }
+
+const cat = id => S.categories.find(c => c.id === id);
+const pName = id => S.players.find(p => p.id === id)?.name ?? '?';
+const cell = (r, pid) => (r.r[pid] ||= {exp:'', bet:false});
+
+// stage 1 = one battle per level 3..10 (everyone on the same level)
+function ensureStage1(st) {
+  if (!st) return st;
+  for (const lvl of LEVELS) {
+    if (!st.rounds.some(r => r.stage === 1 && r.lvl === lvl)) st.rounds.push({id: uid(), stage: 1, lvl, r: {}});
+  }
+  // drop leftovers from the old per-player-level format
+  st.rounds = st.rounds.filter(r => r.stage !== 1 || LEVELS.includes(r.lvl));
+  return st;
+}
+
+/* ---------------- scoring ---------------- */
+function betStatus(r, p) {
+  const me = num(cell(r, p.id).exp);
+  if (me == null) return 'pending';
+  const others = S.players.filter(o => o.id !== p.id);
+  const c = r.stage === 2 ? cat(r.catId) : null;
+  const vals = [];
+  if (c?.unique && r.chooser === p.id) {
+    // compare with other players' own battles in this unique class
+    for (const o of others) {
+      const rr = S.rounds.find(x => x.stage === 2 && x.catId === r.catId && x.chooser === o.id && num(x.r[o.id]?.exp) != null);
+      if (!rr) return 'pending';
+      vals.push(num(rr.r[o.id].exp));
+    }
+  } else {
+    for (const o of others) {
+      const v = num(r.r[o.id]?.exp);
+      if (v == null) return 'pending';
+      vals.push(v);
+    }
+  }
+  return !vals.length || me >= Math.max(...vals) ? 'win' : 'lose';
+}
+
+function compute() {
+  const R = {}, T = {};
+  for (const p of S.players) T[p.id] = {s1:0, s2:0, total:0, bets:{1:0, 2:0}, battles:0};
+  for (const r of S.rounds) {
+    R[r.id] = {};
+    for (const p of S.players) {
+      const c = cell(r, p.id);
+      if (c.bet) T[p.id].bets[r.stage]++;
+      const exp = num(c.exp);
+      if (exp == null) { R[r.id][p.id] = null; continue; }
+      const mult = r.stage === 1 ? (r.lvl || 10) / 10 : 1;
+      const base = exp * mult;
+      let status = null, factor = 1;
+      if (c.bet) { status = betStatus(r, p); factor = status === 'win' ? 2 : status === 'lose' ? 0 : 1; }
+      const pts = base * factor;
+      R[r.id][p.id] = {exp, mult, base, status, factor, pts};
+      T[p.id]['s' + r.stage] += pts;
+      T[p.id].total += pts;
+      T[p.id].battles++;
+    }
+  }
+  return {R, T};
+}
+
+/* ---------------- share ---------------- */
+async function shareLink() {
+  const url = location.origin + location.pathname;
+  try { await navigator.clipboard.writeText(url); toast('Ссылка для зрителей скопирована'); }
+  catch (e) { prompt('Скопируй ссылку:', url); }
+}
+
+/* ---------------- render ---------------- */
+function render() {
+  const app = $('#app');
+  if (VIEW && !S) { app.innerHTML = `<div class="hazard"></div><section class="hero armor" style="margin-top:10px;text-align:center;padding:50px 20px"><div class="kicker">Взводный турнир · World of Tanks</div><h1>Турнир <span>скоро начнётся</span></h1><p class="muted">Страница обновится сама, как только ведущий создаст турнир.</p></section>`; return; }
+  if (!S || EDITING) { app.innerHTML = setupHTML(); return; }
+  const {R, T} = compute();
+  app.innerHTML = `
+    <div class="hazard"></div>
+    <section class="hero armor" style="margin-top:10px">
+      <div class="kicker">Взводный турнир · World of Tanks</div>
+      <h1>${titleHTML(S.name)}</h1>
+      <div class="meta">
+        <span class="chip">Игроков: <b>${S.players.length}</b></span>
+        <span class="chip">I ступень: <b>${S.rounds.filter(r=>r.stage===1).length}</b> боёв</span>
+        <span class="chip">II ступень: <b>${S.rounds.filter(r=>r.stage===2).length}</b> боёв</span>
+        ${VIEW ? '<span class="chip live">● LIVE</span>' : ''}
+      </div>
+      <svg class="tank" viewBox="0 0 240 110" fill="currentColor"><rect x="20" y="62" width="200" height="30" rx="15"/><rect x="40" y="44" width="160" height="22" rx="4"/><rect x="80" y="22" width="80" height="26" rx="8"/><rect x="150" y="30" width="90" height="8" rx="3"/><g fill="#000"><circle cx="45" cy="77" r="9"/><circle cx="75" cy="77" r="9"/><circle cx="105" cy="77" r="9"/><circle cx="135" cy="77" r="9"/><circle cx="165" cy="77" r="9"/><circle cx="195" cy="77" r="9"/></g></svg>
+    </section>
+      ${VIEW ? '' : `<div class="toolbar">
+        <button class="primary" data-act="share">🔗 Ссылка для зрителей</button>
+        <button data-act="edit">⚙️ Настройки</button>
+        <button data-act="export">⬇️ Экспорт</button>
+        <button data-act="import">⬆️ Импорт</button>
+        <button class="danger" data-act="reset">Новый турнир</button>
+      </div>`}
+    <h2>Таблица лидеров</h2>
+    <div id="board">${boardHTML(T)}</div>
+    <div class="tabs">
+      <button class="tab ${TAB===1?'on':''}" data-tab="1">Первая ступень</button>
+      <button class="tab ${TAB===2?'on':''}" data-tab="2">Вторая ступень</button>
+    </div>
+    ${TAB === 1 ? stage1HTML(R, T) : stage2HTML(R, T)}
+  `;
+}
+
+function titleHTML(name) {
+  const w = esc(name).split(' ');
+  return w.length > 1 ? w.slice(0, -1).join(' ') + ' <span>' + w[w.length - 1] + '</span>' : '<span>' + w[0] + '</span>';
+}
+
+function ranked(T) {
+  const sorted = [...S.players].sort((a, b) => T[b.id].total - T[a.id].total);
+  let place = 0, prev = null;
+  return sorted.map((p, i) => { const t = T[p.id]; if (t.total !== prev) { place = i + 1; prev = t.total; } return {p, t, place}; });
+}
+
+function dots(used, lim) {
+  return `<span class="betdots" title="Ставок использовано: ${used} из ${lim}">${Array.from({length: lim}, (_, i) => `<i class="${i < lim - used ? '' : 'u'}"></i>`).join('')}</span>`;
+}
+
+function boardHTML(T) {
+  const list = ranked(T);
+  const max = Math.max(1, ...list.map(x => x.t.total));
+  const top = list.slice(0, 3);
+  const order = [top[1], top[0], top[2]];
+  const cls = {1:'g', 2:'s', 3:'b'};
+  const medal = {1:'🥇', 2:'🥈', 3:'🥉'};
+  const podium = list.length >= 2 ? `<div class="podium">${order.map((x, i) => x ? `
+      <div class="pod armor ${cls[x.place] || ''}">
+        <div class="medal">${medal[x.place] || x.place}</div>
+        <div class="nm">${esc(x.p.name)}</div>
+        <div class="sc">${fmt(x.t.total)}</div><div class="lbl">очков</div>
+        <div class="base">${x.place}</div>
+      </div>` : '<div></div>').join('')}</div>` : '';
+  return podium + `<div class="ltable armor">
+    <div class="lt-row head"><div>#</div><div>Танкист</div><div class="num hide-m">I ступень</div><div class="num hide-m">II ступень</div><div class="num hide-m">Ставки</div><div class="num">Итого</div></div>
+    ${list.map(({p, t, place}) => `
+      <div class="lt-row r${place}">
+        <div class="rk">${place}</div>
+        <div><div class="nm">${esc(p.name)}</div><div class="bar"><i style="width:${Math.max(0, t.total / max * 100)}%"></i></div></div>
+        <div class="num hide-m">${fmt(t.s1)}</div>
+        <div class="num hide-m">${fmt(t.s2)}</div>
+        <div class="num hide-m">${dots(t.bets[1], S.betLimits[1])} ${dots(t.bets[2], S.betLimits[2])}</div>
+        <div class="tot">${fmt(t.total)}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function ptsHTML(x, stage) {
+  if (!x) return '<span class="muted">—</span>';
+  let calc = stage === 1 ? `${fmt(x.exp)} × ${x.mult.toFixed(1)}` : '';
+  let st = '';
+  if (x.status === 'win') st = `<span class="win"> ×2 ✅</span>`;
+  if (x.status === 'lose') st = `<span class="lose"> ×0 ❌</span>`;
+  if (x.status === 'pending') st = `<span class="pend"> ставка ⏳</span>`;
+  return `<b>${fmt(x.pts)}</b><span class="calc">${calc}${st}</span>`;
+}
+
+function betHTML(r, p, T) {
+  const c = cell(r, p.id);
+  const lim = S.betLimits[r.stage];
+  const off = VIEW || (!c.bet && T[p.id].bets[r.stage] >= lim);
+  return `<label class="bet ${off && !c.bet ? 'off' : ''}"><input type="checkbox" data-rid="${r.id}" data-pid="${p.id}" data-f="bet" ${c.bet?'checked':''} ${off?'disabled':''}> Ставка</label>`;
+}
+
+function stage1HTML(R, T) {
+  const rounds = S.rounds.filter(r => r.stage === 1).sort((a, b) => a.lvl - b.lvl);
+  return `
+    <h2>Первая ступень</h2>
+    <p class="rules">8 боёв — по одному на каждом уровне с 3 по 10, все на одном уровне. Очки = опыт × множитель уровня (3 ур — ×0.3 … 10 ур — ×1). Ставка «буду первым по опыту»: победа — ×2, поражение — ×0. Ставок на ступень: ${S.betLimits[1]}.</p>
+    <div class="rounds">
+      ${rounds.map(r => {
+        const done = S.players.every(p => num(cell(r, p.id).exp) != null);
+        return `
+        <div class="round armor">
+          <div class="rhead"><h3>${r.lvl} уровень <span class="tag">×${(r.lvl / 10).toFixed(1)}</span></h3><span class="tag" data-done="${r.id}" style="background:#1f3318;color:var(--win);${done ? '' : 'display:none'}">сыгран</span></div>
+          <div class="prow s2 head"><div>Игрок</div><div>Опыт</div><div></div><div class="pts">Очки</div></div>
+          ${S.players.map(p => { const c = cell(r, p.id); return `
+            <div class="prow s2">
+              <div class="pname">${esc(p.name)}</div>
+              <input type="number" inputmode="numeric" placeholder="опыт" value="${esc(c.exp)}" data-rid="${r.id}" data-pid="${p.id}" data-f="exp" ${VIEW?'disabled':''}>
+              ${betHTML(r, p, T)}
+              <div class="pts" data-out="${r.id}:${p.id}">${ptsHTML(R[r.id][p.id], 1)}</div>
+            </div>`; }).join('')}
+        </div>`; }).join('')}
+    </div>
+  `;
+}
+
+function catUsage() {
+  const used = {};
+  for (const c of S.categories) used[c.id] = [];
+  for (const r of S.rounds) if (r.stage === 2 && used[r.catId]) used[r.catId].push(r.chooser);
+  return used;
+}
+
+function stage2HTML(R, T) {
+  const rounds = S.rounds.filter(r => r.stage === 2);
+  const used = catUsage();
+  return `
+    <h2>Вторая ступень</h2>
+    <p class="rules">Множитель уровня не работает. По очереди каждый выбирает категорию и подбирает танки. Арта и ЛТ — уникальные: каждый играет на них сам. Ставка на уникальном классе сравнивается с боями остальных на этом же классе. Ставок на ступень: ${S.betLimits[2]}.</p>
+    <div class="cats">${S.categories.map(c => {
+      const u = used[c.id];
+      const who = c.unique ? `<span class="who">${S.players.map(p => (u.includes(p.id) ? '✓ ' : '· ') + esc(p.name)).join(' ')}</span>` : (u.length ? `<span class="who">${esc(pName(u[0]))}</span>` : '');
+      return `<div class="cat armor ${u.length >= c.slots ? 'done' : ''}">${esc(c.name)}<span class="cnt">${u.length}/${c.slots}</span>${who}</div>`;
+    }).join('')}</div>
+    <div class="rounds">
+      ${rounds.length ? rounds.map((r, i) => {
+        const c = cat(r.catId);
+        return `
+        <div class="round armor">
+          <div class="rhead">
+            <h3>Бой ${i + 1}${c?.unique ? ' <span class="tag">уникальный</span>' : ''}</h3>
+            <select data-rid="${r.id}" data-rf="catId" ${VIEW?'disabled':''}>${S.categories.map(k => `<option value="${k.id}" ${k.id===r.catId?'selected':''}>${esc(k.name)} (${used[k.id].length}/${k.slots})</option>`).join('')}</select>
+            <select data-rid="${r.id}" data-rf="chooser" ${VIEW?'disabled':''}>${S.players.map(p => `<option value="${p.id}" ${p.id===r.chooser?'selected':''}>Выбирает: ${esc(p.name)}</option>`).join('')}</select>
+            ${VIEW ? '' : `<button class="small danger" data-del="${r.id}">Удалить</button>`}
+          </div>
+          <div class="prow s2 head"><div>Игрок</div><div>Опыт</div><div></div><div class="pts">Очки</div></div>
+          ${S.players.map(p => { const cl = cell(r, p.id); return `
+            <div class="prow s2">
+              <div class="pname">${esc(p.name)}${p.id === r.chooser ? `<span class="tag">${c?.unique ? 'на ' + esc(c.name) : 'выбирал'}</span>` : ''}</div>
+              <input type="number" inputmode="numeric" placeholder="опыт" value="${esc(cl.exp)}" data-rid="${r.id}" data-pid="${p.id}" data-f="exp" ${VIEW?'disabled':''}>
+              ${betHTML(r, p, T)}
+              <div class="pts" data-out="${r.id}:${p.id}">${ptsHTML(R[r.id][p.id], 2)}</div>
+            </div>`; }).join('')}
+        </div>`; }).join('') : `<div class="empty">Боёв пока нет</div>`}
+    </div>
+    ${VIEW ? '' : `<p><button class="primary" data-act="add2">+ Добавить бой</button></p>`}
+  `;
+}
+
+function playerInput(n, i) {
+  return `<div class="pi"><span>${i + 1}</span><input name="player" value="${esc(n)}" placeholder="Ник игрока ${i + 1}" ${i === 0 ? 'required' : ''}><button type="button" class="small" data-act="delPlayer" title="Убрать">✕</button></div>`;
+}
+function renumber() { document.querySelectorAll('#plist .pi span').forEach((el, i) => el.textContent = i + 1); }
+
+function setupHTML() {
+  const e = S && EDITING;
+  return `
+    <form class="setup armor" id="setup">
+      <div class="kicker stencil muted" style="font-size:12px;letter-spacing:3px">World of Tanks · взводный турнир</div>
+      <h1>${e ? 'Настройки турнира' : 'Новый турнир'}</h1>
+      <label>Название турнира<input name="name" value="${esc(e ? S.name : 'Турнир взвода')}" required></label>
+      <div class="hazard"></div>
+      <label>Состав взвода</label>
+      <div class="plist" id="plist">${(e ? S.players.map(p => p.name) : ['', '', '']).map((n, i) => playerInput(n, i)).join('')}</div>
+      <button type="button" data-act="addPlayer">+ Добавить игрока</button>
+      <div class="row2">
+        <label>Ставок в I ступени<input name="b1" type="number" min="0" value="${e ? S.betLimits[1] : 1}"></label>
+        <label>Ставок во II ступени<input name="b2" type="number" min="0" value="${e ? S.betLimits[2] : 2}"></label>
+      </div>
+      ${e ? `<p class="rules">Переименование сохраняет результаты — игроки сопоставляются по порядку.</p>` : ''}
+      <div class="btns">
+        <button class="primary" type="submit">${e ? 'Сохранить' : 'Создать турнир'}</button>
+        ${e ? `<button type="button" data-act="cancelEdit">Отмена</button>` : `<button type="button" data-act="import">⬆️ Импорт из файла</button>`}
+      </div>
+    </form>`;
+}
+
+/* ---------------- light refresh (keeps input focus) ---------------- */
+function refresh() {
+  const {R, T} = compute();
+  $('#board').innerHTML = boardHTML(T);
+  for (const el of document.querySelectorAll('[data-out]')) {
+    const [rid, pid] = el.dataset.out.split(':');
+    const r = S.rounds.find(x => x.id === rid);
+    el.innerHTML = ptsHTML(R[rid][pid], r.stage);
+  }
+  for (const el of document.querySelectorAll('[data-done]')) {
+    const r = S.rounds.find(x => x.id === el.dataset.done);
+    el.style.display = S.players.every(p => num(cell(r, p.id).exp) != null) ? '' : 'none';
+  }
+}
+
+/* ---------------- events ---------------- */
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (VIEW || t.dataset.f !== 'exp') return;
+  const r = S.rounds.find(x => x.id === t.dataset.rid);
+  cell(r, t.dataset.pid).exp = t.value;
+  save(); refresh();
+});
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (VIEW) return;
+  if (t.id === 'importFile') return importFile(t);
+  const r = S?.rounds.find(x => x.id === t.dataset.rid);
+  if (!r) return;
+  if (t.dataset.f === 'bet') cell(r, t.dataset.pid).bet = t.checked;
+  else if (t.dataset.rf) r[t.dataset.rf] = t.value;
+  else return;
+  save(); render();
+});
+
+document.addEventListener('submit', e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const names = f.getAll('player').map(s => s.trim()).filter(Boolean);
+  if (!names.length) return;
+  const limits = {1: Math.max(0, +f.get('b1') || 0), 2: Math.max(0, +f.get('b2') || 0)};
+  if (S && EDITING) {
+    const old = S.players;
+    S.players = names.map((n, i) => ({id: old[i]?.id || uid(), name: n}));
+    S.name = f.get('name'); S.betLimits = limits;
+    for (const c of S.categories) if (c.unique) c.slots = S.players.length;
+  } else {
+    const players = names.map(n => ({id: uid(), name: n}));
+    S = {v:1, name: f.get('name'), players, betLimits: limits, categories: defaultCats(players.length), rounds: []};
+    ensureStage1(S);
+    TAB = 1;
+  }
+  EDITING = false; save(); render();
+});
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act],[data-tab],[data-del]');
+  if (!t) return;
+  if (t.dataset.tab) { TAB = +t.dataset.tab; return render(); }
+  if (t.dataset.act === 'addPlayer') {
+    const pl = $('#plist'); pl.insertAdjacentHTML('beforeend', playerInput('', pl.children.length));
+    pl.lastElementChild.querySelector('input').focus(); return;
+  }
+  if (t.dataset.act === 'delPlayer') { if ($('#plist').children.length > 1) { t.closest('.pi').remove(); renumber(); } return; }
+  if (VIEW) return;
+  if (t.dataset.del) {
+    if (!confirm('Удалить этот бой?')) return;
+    S.rounds = S.rounds.filter(r => r.id !== t.dataset.del); save(); return render();
+  }
+  const a = t.dataset.act;
+  if (a === 'add2') {
+    const n = S.rounds.filter(r => r.stage === 2).length;
+    const chooser = S.players[n % S.players.length].id;
+    const used = catUsage();
+    // prefer a unique category this chooser hasn't played yet only if nothing else; default = first free category
+    const free = S.categories.find(c => used[c.id].length < c.slots && !(c.unique && used[c.id].includes(chooser))) || S.categories[0];
+    const r = {id: uid(), stage: 2, catId: free.id, chooser, r: {}};
+    for (const p of S.players) r.r[p.id] = {exp:'', bet:false};
+    S.rounds.push(r); save(); render();
+    document.querySelector(`[data-rid="${r.id}"][data-f="exp"]`)?.focus();
+  }
+  if (a === 'share') shareLink();
+  if (a === 'edit') { EDITING = true; render(); }
+  if (a === 'cancelEdit') { EDITING = false; render(); }
+  if (a === 'export') {
+    const blob = new Blob([JSON.stringify(S, null, 2)], {type: 'application/json'});
+    const link = Object.assign(document.createElement('a'), {href: URL.createObjectURL(blob), download: (S.name || 'turnir') + '.json'});
+    link.click(); URL.revokeObjectURL(link.href);
+  }
+  if (a === 'import') $('#importFile').click();
+  if (a === 'reset') {
+    if (!confirm('Начать новый турнир? Текущие результаты будут удалены (сначала сделай экспорт, если нужно).')) return;
+    S = null; save(); render();
+  }
+});
+
+function importFile(input) {
+  const file = input.files[0]; if (!file) return;
+  file.text().then(txt => {
+    const d = JSON.parse(txt);
+    if (!d.players || !d.rounds) throw 0;
+    S = ensureStage1(d); EDITING = false; save(); render(); toast('Турнир загружен');
+  }).catch(() => alert('Не удалось прочитать файл')).finally(() => input.value = '');
+}
+
+/* ---------------- boot ---------------- */
+document.addEventListener('click', e => {
+  if (!e.target.closest('#sync') || VIEW) return;
+  const cls = $('#sync').className;
+  if (cls.includes('auth')) adminKey(true);
+  if (cls.includes('auth') || cls.includes('err')) push();
+});
+
+async function boot() {
+  const wantAdmin = new URLSearchParams(location.search).has('admin');
+  let remote = null;
+  try { remote = await fetchRemote(); API_OK = true; lastRemote = JSON.stringify(remote); } catch (e) { API_OK = false; }
+  if (API_OK && !wantAdmin) {
+    // viewer: read-only, auto-refresh
+    VIEW = true; S = ensureStage1(remote); render(); setSync('live'); startPolling();
+    return;
+  }
+  VIEW = false;
+  const local = loadLocal();
+  // take whichever copy is newer (lets the host continue from another device)
+  S = ensureStage1((remote?.updatedAt || 0) > (local?.updatedAt || 0) ? remote : local);
+  render();
+  if (API_OK) { adminKey(); setSync('ok'); if (S && S !== remote) save(); }
+  else setSync('off');
+}
+boot();
+</script>
+</body>
+</html>
