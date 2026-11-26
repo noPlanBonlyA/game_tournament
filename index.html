@@ -251,6 +251,25 @@ function ensureStage1(st) {
   }
   // drop leftovers from the old per-player-level format
   st.rounds = st.rounds.filter(r => r.stage !== 1 || LEVELS.includes(r.lvl));
+
+  // stage 2 = fixed battles: one per common category, one per player for unique classes (art, LT)
+  const n = st.players.length;
+  for (const c of st.categories) if (c.unique) c.slots = n;
+  const keep = [];
+  let common = 0;
+  for (const c of st.categories) {
+    const mine = st.rounds.filter(r => r.stage === 2 && r.catId === c.id);
+    for (let k = 0; k < c.slots; k++) {
+      let r = mine.find(x => x.slot === k) || mine.find(x => x.slot == null);
+      if (!r) r = {id: uid(), stage: 2, catId: c.id, r: {}};
+      r.slot = k;
+      if (c.unique) r.chooser = st.players[k]?.id;
+      else if (!st.players.some(p => p.id === r.chooser)) r.chooser = st.players[common % n]?.id;
+      if (!c.unique) common++;
+      keep.push(r);
+    }
+  }
+  st.rounds = st.rounds.filter(r => r.stage === 1).concat(keep);
   return st;
 }
 
@@ -302,6 +321,138 @@ function compute() {
   return {R, T};
 }
 
+
+/* ---------------- markdown report ---------------- */
+function download(text, name, type) {
+  const blob = new Blob([text], {type: type + ';charset=utf-8'});
+  const link = Object.assign(document.createElement('a'), {href: URL.createObjectURL(blob), download: name});
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+function reportMD() {
+  const {R, T} = compute();
+  const md = s => String(s ?? '').replace(/\|/g, '\\|');
+  const N = id => md(pName(id));
+  const list = ranked(T);
+  const medal = pl => ['🥇', '🥈', '🥉'][pl - 1] || `${pl}.`;
+  const date = new Date(S.updatedAt || Date.now()).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long', year: 'numeric'});
+  const s1 = S.rounds.filter(r => r.stage === 1).sort((a, b) => a.lvl - b.lvl);
+  const s2 = S.rounds.filter(r => r.stage === 2);
+  const played = r => S.players.some(p => R[r.id][p.id]);
+  const roundName = r => r.stage === 1 ? `${r.lvl} ур.` : `${cat(r.catId)?.name || '?'}${cat(r.catId)?.unique ? ' (' + pName(r.chooser) + ')' : ''}`;
+  const betMark = x => x?.status === 'win' ? ' 🎲✅' : x?.status === 'lose' ? ' 🎲❌' : x?.status === 'pending' ? ' 🎲⏳' : '';
+  const out = [];
+  const L = (...a) => out.push(...a);
+
+  // ----- header & winner
+  L(`# 🏆 ${md(S.name)}`, '', `> **Взводный турнир World of Tanks** · ${date} · ${S.players.length} танкиста · ${[...s1, ...s2].filter(played).length} боёв`, '');
+  const [w, second] = list;
+  if (w && w.t.total > 0) {
+    L(`## 👑 Победитель — ${N(w.p.id)}`, '');
+    const gap = second ? w.t.total - second.t.total : 0;
+    const tone = !second ? '' : gap === 0 ? 'Абсолютная ничья на вершине — делят первое место!' :
+      gap < w.t.total * 0.05 ? `Победа в упор: отрыв от второго места (${N(second.p.id)}) всего **${fmt(gap)}** очков. Решило буквально несколько выстрелов.` :
+      gap < w.t.total * 0.2 ? `Уверенная победа: **${fmt(gap)}** очков отрыва от второго места (${N(second.p.id)}).` :
+      `Разгромная победа: второе место (${N(second.p.id)}) позади на **${fmt(gap)}** очков.`;
+    L(`**${fmt(w.t.total)} очков** — ${tone}`, '');
+  }
+
+  // ----- standings
+  L(`## 🎖 Итоговая таблица`, '', `| Место | Танкист | I ступень | II ступень | Ставки | **Итого** |`, `|:---:|---|---:|---:|:---:|---:|`);
+  for (const {p, t, place} of list) {
+    const bets = S.rounds.flatMap(r => R[r.id][p.id]?.status ? [R[r.id][p.id].status] : []);
+    const bs = bets.length ? bets.map(b => b === 'win' ? '✅' : b === 'lose' ? '❌' : '⏳').join(' ') : '—';
+    L(`| ${medal(place)} | **${N(p.id)}** | ${fmt(t.s1)} | ${fmt(t.s2)} | ${bs} | **${fmt(t.total)}** |`);
+  }
+  L('');
+
+  // ----- progression
+  const seq = [...s1, ...s2].filter(played);
+  if (seq.length) {
+    L(`## 📈 Как шла гонка`, '', `Накопленные очки после каждого боя. Жирным — лидер на тот момент.`, '');
+    L(`| # | Бой | ${S.players.map(p => N(p.id)).join(' | ')} | Лидер |`, `|---:|---|${S.players.map(() => '---:').join('|')}|---|`);
+    const acc = Object.fromEntries(S.players.map(p => [p.id, 0]));
+    let prevLeader = null; const swaps = [];
+    seq.forEach((r, i) => {
+      for (const p of S.players) acc[p.id] += R[r.id][p.id]?.pts || 0;
+      const top = Math.max(...S.players.map(p => acc[p.id]));
+      const leaders = S.players.filter(p => acc[p.id] === top).map(p => p.id);
+      const lead = leaders.length > 1 ? 'ничья' : pName(leaders[0]);
+      if (leaders.length === 1 && prevLeader && prevLeader !== leaders[0]) swaps.push(`${N(leaders[0])} выходит вперёд после боя «${md(roundName(r))}»`);
+      if (leaders.length === 1) prevLeader = leaders[0];
+      L(`| ${i + 1} | ${i < s1.filter(played).length ? 'I' : 'II'} · ${md(roundName(r))} | ${S.players.map(p => acc[p.id] === top ? `**${fmt(acc[p.id])}**` : fmt(acc[p.id])).join(' | ')} | ${md(lead)} |`);
+    });
+    L('');
+    if (swaps.length) L(`**Смены лидера (${swaps.length}):**`, '', ...swaps.map(x => `- 🔄 ${x}`), '');
+    else if (prevLeader) L(`🔒 ${N(prevLeader)} — лидер с первого боя и до самого конца.`, '');
+  }
+
+  // ----- stage 1
+  if (s1.some(played)) {
+    L(`## ⚔️ Первая ступень — с 3 по 10 уровень`, '', `Очки = опыт × множитель уровня. Формат ячейки: *опыт → очки*.`, '');
+    L(`| Уровень | ×  | ${S.players.map(p => N(p.id)).join(' | ')} | Лучший |`, `|:---:|:---:|${S.players.map(() => '---:').join('|')}|---|`);
+    for (const r of s1) {
+      if (!played(r)) { L(`| ${r.lvl} | ×${(r.lvl / 10).toFixed(1)} | ${S.players.map(() => '—').join(' | ')} | не сыгран |`); continue; }
+      const best = S.players.reduce((b, p) => (R[r.id][p.id]?.exp ?? -1) > (R[r.id][b.id]?.exp ?? -1) ? p : b);
+      L(`| **${r.lvl}** | ×${(r.lvl / 10).toFixed(1)} | ${S.players.map(p => { const x = R[r.id][p.id]; return x ? `${fmt(x.exp)} → **${fmt(x.pts)}**${betMark(x)}` : '—'; }).join(' | ')} | ${N(best.id)} |`);
+    }
+    L('', `**Итог ступени:** ${list.slice().sort((a, b) => b.t.s1 - a.t.s1).map(x => `${N(x.p.id)} — ${fmt(x.t.s1)}`).join(' · ')}`, '');
+  }
+
+  // ----- stage 2
+  if (s2.some(played)) {
+    L(`## 🎯 Вторая ступень — категории`, '', `Без множителя уровня: сколько настрелял — столько и получил. Формат ячейки: *опыт → очки*.`, '');
+    L(`| # | Категория | Выбирал | ${S.players.map(p => N(p.id)).join(' | ')} | Лучший |`, `|---:|---|---|${S.players.map(() => '---:').join('|')}|---|`);
+    s2.forEach((r, i) => {
+      const c = cat(r.catId);
+      const best = S.players.reduce((b, p) => (R[r.id][p.id]?.exp ?? -1) > (R[r.id][b.id]?.exp ?? -1) ? p : b);
+      L(`| ${i + 1} | ${md(c?.name)}${c?.unique ? ' ⭐' : ''} | ${N(r.chooser)} | ${S.players.map(p => { const x = R[r.id][p.id]; const me = p.id === r.chooser && c?.unique ? ' *(на ' + md(c.name) + ')*' : ''; return x ? `${fmt(x.exp)} → **${fmt(x.pts)}**${betMark(x)}${me}` : '—'; }).join(' | ')} | ${played(r) ? N(best.id) : '—'} |`);
+    });
+    L('', `⭐ — уникальный класс: каждый играет на нём сам.`, '');
+    L(`**Итог ступени:** ${list.slice().sort((a, b) => b.t.s2 - a.t.s2).map(x => `${N(x.p.id)} — ${fmt(x.t.s2)}`).join(' · ')}`, '');
+  }
+
+  // ----- bets
+  const bets = [];
+  for (const r of [...s1, ...s2]) for (const p of S.players) { const x = R[r.id][p.id]; if (x?.status) bets.push({r, p, x}); }
+  if (bets.length) {
+    const won = bets.filter(b => b.x.status === 'win'), lost = bets.filter(b => b.x.status === 'lose');
+    L(`## 🎲 Ставки «буду первым»`, '', `Сыграло **${won.length}** из ${bets.length}. Выигрыш удваивает очки за бой, проигрыш обнуляет.`, '');
+    L(`| Танкист | Бой | Опыт | Результат | Очки |`, `|---|---|---:|:---:|---:|`);
+    for (const {r, p, x} of bets) L(`| ${N(p.id)} | ${md(roundName(r))} | ${fmt(x.exp)} | ${x.status === 'win' ? '✅ ×2' : x.status === 'lose' ? '❌ ×0' : '⏳'} | ${x.status === 'win' ? '+' + fmt(x.base) : x.status === 'lose' ? '−' + fmt(x.base) : fmt(x.pts)} |`);
+    L('');
+  }
+
+  // ----- highlights
+  const all = [];
+  for (const r of [...s1, ...s2]) for (const p of S.players) { const x = R[r.id][p.id]; if (x) all.push({r, p, x}); }
+  if (all.length) {
+    L(`## 🔥 Яркие моменты`, '');
+    const maxBy = (arr, f) => arr.reduce((b, a) => f(a) > f(b) ? a : b);
+    const e = maxBy(all, a => a.x.exp);
+    L(`- 💥 **Самый мощный бой:** ${N(e.p.id)} — ${fmt(e.x.exp)} опыта (${md(roundName(e.r))})`);
+    const pt = maxBy(all, a => a.x.pts);
+    if (pt !== e) L(`- 🏅 **Больше всего очков за бой:** ${N(pt.p.id)} — ${fmt(pt.x.pts)} (${md(roundName(pt.r))})`);
+    const bw = bets.filter(b => b.x.status === 'win');
+    if (bw.length) { const b = maxBy(bw, a => a.x.base); L(`- 🎰 **Лучшая ставка:** ${N(b.p.id)}, «${md(roundName(b.r))}» — +${fmt(b.x.base)} очков сверху`); }
+    const bl = bets.filter(b => b.x.status === 'lose');
+    if (bl.length) { const b = maxBy(bl, a => a.x.base); L(`- 💀 **Самый болезненный провал:** ${N(b.p.id)}, «${md(roundName(b.r))}» — ставка обнулила ${fmt(b.x.base)} очков`); }
+    for (const c of S.categories.filter(c => c.unique)) {
+      const own = s2.filter(r => r.catId === c.id && R[r.id][r.chooser]).map(r => ({p: r.chooser, exp: R[r.id][r.chooser].exp}));
+      if (own.length) { const k = maxBy(own, a => a.exp); L(`- 👑 **Король класса «${md(c.name)}»:** ${N(k.p)} — ${fmt(k.exp)} опыта`); }
+    }
+    const lo = all.filter(a => a.x.exp > 0);
+    if (lo.length > 1) { const m = lo.reduce((b, a) => a.x.exp < b.x.exp ? a : b); L(`- 🥔 **Самый тихий бой:** ${N(m.p.id)} — ${fmt(m.x.exp)} опыта (${md(roundName(m.r))}). Бывает.`); }
+    const avg = S.players.map(p => { const xs = all.filter(a => a.p.id === p.id); return {p, v: xs.length ? xs.reduce((s, a) => s + a.x.exp, 0) / xs.length : 0}; });
+    const ac = maxBy(avg, a => a.v);
+    L(`- 📊 **Лучший средний опыт:** ${N(ac.p.id)} — ${fmt(ac.v)} за бой`, '');
+  }
+
+  L(`---`, '', `*Отчёт сгенерирован ${new Date().toLocaleString('ru-RU')} · Правила: I ступень — опыт × уровень/10, ставок ${S.betLimits[1]}; II ступень — чистый опыт, ставок ${S.betLimits[2]}.*`, '');
+  return out.join('\n');
+}
+
 /* ---------------- share ---------------- */
 async function shareLink() {
   const url = location.origin + location.pathname;
@@ -328,10 +479,11 @@ function render() {
       </div>
       <svg class="tank" viewBox="0 0 240 110" fill="currentColor"><rect x="20" y="62" width="200" height="30" rx="15"/><rect x="40" y="44" width="160" height="22" rx="4"/><rect x="80" y="22" width="80" height="26" rx="8"/><rect x="150" y="30" width="90" height="8" rx="3"/><g fill="#000"><circle cx="45" cy="77" r="9"/><circle cx="75" cy="77" r="9"/><circle cx="105" cy="77" r="9"/><circle cx="135" cy="77" r="9"/><circle cx="165" cy="77" r="9"/><circle cx="195" cy="77" r="9"/></g></svg>
     </section>
-      ${VIEW ? '' : `<div class="toolbar">
+      ${VIEW ? `<div class="toolbar"><button data-act="report">📜 Отчёт о турнире (.md)</button></div>` : `<div class="toolbar">
         <button class="primary" data-act="share">🔗 Ссылка для зрителей</button>
+        <button data-act="report">📜 Отчёт (.md)</button>
         <button data-act="edit">⚙️ Настройки</button>
-        <button data-act="export">⬇️ Экспорт</button>
+        <button data-act="export">⬇️ Бэкап (.json)</button>
         <button data-act="import">⬆️ Импорт</button>
         <button class="danger" data-act="reset">Новый турнир</button>
       </div>`}
@@ -429,34 +581,32 @@ function stage1HTML(R, T) {
   `;
 }
 
-function catUsage() {
-  const used = {};
-  for (const c of S.categories) used[c.id] = [];
-  for (const r of S.rounds) if (r.stage === 2 && used[r.catId]) used[r.catId].push(r.chooser);
-  return used;
-}
+function isPlayed(r) { return S.players.every(p => num(cell(r, p.id).exp) != null); }
 
 function stage2HTML(R, T) {
   const rounds = S.rounds.filter(r => r.stage === 2);
-  const used = catUsage();
+  const total = rounds.length, done = rounds.filter(isPlayed).length;
   return `
     <h2>Вторая ступень</h2>
-    <p class="rules">Множитель уровня не работает. По очереди каждый выбирает категорию и подбирает танки. Арта и ЛТ — уникальные: каждый играет на них сам. Ставка на уникальном классе сравнивается с боями остальных на этом же классе. Ставок на ступень: ${S.betLimits[2]}.</p>
+    <p class="rules">${total} боёв, множитель уровня не работает. Общие категории: по очереди кто-то выбирает категорию и подбирает всем танки. Арта и ЛТ — уникальные: каждый обязан сыграть на них сам, остальным он подбирает танки того же уровня. Ставка на своём уникальном бою сравнивается с уникальными боями остальных. Ставок на ступень: ${S.betLimits[2]}.</p>
     <div class="cats">${S.categories.map(c => {
-      const u = used[c.id];
-      const who = c.unique ? `<span class="who">${S.players.map(p => (u.includes(p.id) ? '✓ ' : '· ') + esc(p.name)).join(' ')}</span>` : (u.length ? `<span class="who">${esc(pName(u[0]))}</span>` : '');
-      return `<div class="cat armor ${u.length >= c.slots ? 'done' : ''}">${esc(c.name)}<span class="cnt">${u.length}/${c.slots}</span>${who}</div>`;
+      const rs = rounds.filter(r => r.catId === c.id);
+      const pl = rs.filter(isPlayed);
+      const who = c.unique
+        ? `<span class="who">${rs.map(r => (isPlayed(r) ? '✓ ' : '· ') + esc(pName(r.chooser))).join(' ')}</span>`
+        : `<span class="who">${pl.length ? 'выбирал ' + esc(pName(rs[0].chooser)) : 'не сыгран'}</span>`;
+      return `<div class="cat armor ${pl.length >= rs.length ? 'done' : ''}">${esc(c.name)}<span class="cnt">${pl.length}/${rs.length}</span>${who}</div>`;
     }).join('')}</div>
+    <p class="muted" style="margin:0 0 12px">Сыграно ${done} из ${total}</p>
     <div class="rounds">
-      ${rounds.length ? rounds.map((r, i) => {
+      ${rounds.map((r, i) => {
         const c = cat(r.catId);
         return `
         <div class="round armor">
           <div class="rhead">
-            <h3>Бой ${i + 1}${c?.unique ? ' <span class="tag">уникальный</span>' : ''}</h3>
-            <select data-rid="${r.id}" data-rf="catId" ${VIEW?'disabled':''}>${S.categories.map(k => `<option value="${k.id}" ${k.id===r.catId?'selected':''}>${esc(k.name)} (${used[k.id].length}/${k.slots})</option>`).join('')}</select>
-            <select data-rid="${r.id}" data-rf="chooser" ${VIEW?'disabled':''}>${S.players.map(p => `<option value="${p.id}" ${p.id===r.chooser?'selected':''}>Выбирает: ${esc(p.name)}</option>`).join('')}</select>
-            ${VIEW ? '' : `<button class="small danger" data-del="${r.id}">Удалить</button>`}
+            <h3>${i + 1}. ${esc(c?.name)}${c?.unique ? ` · ${esc(pName(r.chooser))} <span class="tag">уникальный</span>` : ''}</h3>
+            <span class="tag" data-done="${r.id}" style="background:#1f3318;color:var(--win);${isPlayed(r) ? '' : 'display:none'}">сыгран</span>
+            ${c?.unique ? '' : `<select data-rid="${r.id}" data-rf="chooser" ${VIEW?'disabled':''}>${S.players.map(p => `<option value="${p.id}" ${p.id===r.chooser?'selected':''}>Выбирает: ${esc(p.name)}</option>`).join('')}</select>`}
           </div>
           <div class="prow s2 head"><div>Игрок</div><div>Опыт</div><div></div><div class="pts">Очки</div></div>
           ${S.players.map(p => { const cl = cell(r, p.id); return `
@@ -466,9 +616,8 @@ function stage2HTML(R, T) {
               ${betHTML(r, p, T)}
               <div class="pts" data-out="${r.id}:${p.id}">${ptsHTML(R[r.id][p.id], 2)}</div>
             </div>`; }).join('')}
-        </div>`; }).join('') : `<div class="empty">Боёв пока нет</div>`}
+        </div>`; }).join('')}
     </div>
-    ${VIEW ? '' : `<p><button class="primary" data-act="add2">+ Добавить бой</button></p>`}
   `;
 }
 
@@ -546,7 +695,7 @@ document.addEventListener('submit', e => {
     const old = S.players;
     S.players = names.map((n, i) => ({id: old[i]?.id || uid(), name: n}));
     S.name = f.get('name'); S.betLimits = limits;
-    for (const c of S.categories) if (c.unique) c.slots = S.players.length;
+    ensureStage1(S);
   } else {
     const players = names.map(n => ({id: uid(), name: n}));
     S = {v:1, name: f.get('name'), players, betLimits: limits, categories: defaultCats(players.length), rounds: []};
@@ -565,30 +714,18 @@ document.addEventListener('click', e => {
     pl.lastElementChild.querySelector('input').focus(); return;
   }
   if (t.dataset.act === 'delPlayer') { if ($('#plist').children.length > 1) { t.closest('.pi').remove(); renumber(); } return; }
+  if (t.dataset.act === 'report') return download(reportMD(), (S.name || 'turnir') + ' — отчёт.md', 'text/markdown');
   if (VIEW) return;
   if (t.dataset.del) {
     if (!confirm('Удалить этот бой?')) return;
     S.rounds = S.rounds.filter(r => r.id !== t.dataset.del); save(); return render();
   }
   const a = t.dataset.act;
-  if (a === 'add2') {
-    const n = S.rounds.filter(r => r.stage === 2).length;
-    const chooser = S.players[n % S.players.length].id;
-    const used = catUsage();
-    // prefer a unique category this chooser hasn't played yet only if nothing else; default = first free category
-    const free = S.categories.find(c => used[c.id].length < c.slots && !(c.unique && used[c.id].includes(chooser))) || S.categories[0];
-    const r = {id: uid(), stage: 2, catId: free.id, chooser, r: {}};
-    for (const p of S.players) r.r[p.id] = {exp:'', bet:false};
-    S.rounds.push(r); save(); render();
-    document.querySelector(`[data-rid="${r.id}"][data-f="exp"]`)?.focus();
-  }
   if (a === 'share') shareLink();
   if (a === 'edit') { EDITING = true; render(); }
   if (a === 'cancelEdit') { EDITING = false; render(); }
   if (a === 'export') {
-    const blob = new Blob([JSON.stringify(S, null, 2)], {type: 'application/json'});
-    const link = Object.assign(document.createElement('a'), {href: URL.createObjectURL(blob), download: (S.name || 'turnir') + '.json'});
-    link.click(); URL.revokeObjectURL(link.href);
+    download(JSON.stringify(S, null, 2), (S.name || 'turnir') + '.json', 'application/json');
   }
   if (a === 'import') $('#importFile').click();
   if (a === 'reset') {
