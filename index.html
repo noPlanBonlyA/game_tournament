@@ -257,6 +257,7 @@ body.first .round{animation:slidein .5s ease both}
 .hand .hn span{color:var(--gold);font-size:13px;font-weight:600}
 .hc{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .hcard{width:30px;height:38px;display:grid;place-items:center;font-size:16px;border-radius:5px;background:linear-gradient(180deg,#3d3315,#241f0e);border:1px solid #7a5f1a;box-shadow:0 2px 0 #000;cursor:help}
+.hcard.sh{border-color:#ff7a4d;background:linear-gradient(180deg,#4a1a10,#2a100a)}
 .hcard.u{opacity:.25;filter:grayscale(1);box-shadow:none;transform:scale(.9)}
 .deck{margin:10px 0;font-size:13px;background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
 .deck summary{cursor:pointer;font-weight:600;color:var(--gold)}
@@ -391,21 +392,22 @@ const CARDS = {
   nav:    {i: '🧭', n: 'Штурман',       d: 'выбираешь, на какое направление едет весь взвод'},
   swap:   {i: '🔄', n: 'Обмен',         d: 'после боя меняешься опытом с соперником', target: true},
   duel:   {i: '⚔️', n: 'Дуэль',         d: 'у кого больше опыта — забирает 25% очков другого', target: true},
-  he:     {i: '🧨', n: 'Только фугасы', d: 'на весь бой: все (и ты) едут только на фугасах, первый по опыту — ×1.5'},
+  he:     {i: '🧨', n: 'Только фугасы', d: 'на весь бой: все (и ты) едут только на фугасах, первый по опыту — ×1.5. Одна на весь турнир — в I или во II ступени'},
   pick:   {i: '🎯', n: 'Выбор танка',   d: 'выбираешь сопернику танк; если он всё равно первый — ×1.5', target: true},
 };
 const DECK = {
-  1: ['bet', 'turtle', 'dmg', 'frag', 'nav', 'duel'],
+  1: ['bet', 'turtle', 'dmg', 'frag', 'nav', 'duel', 'he'],
   2: ['double', 'bet', 'turtle', 'dmg', 'blk', 'spot', 'frag', 'nav', 'swap', 'duel', 'he', 'pick'],
   3: [],
 };
 const STAT = {dmg: {i: '💥', n: 'урон'}, blk: {i: '🛡️', n: 'блок'}, spot: {i: '🔦', n: 'засвет'}, frag: {i: '💀', n: 'фраги'}};
 const UNIQUE_OK = ['double', 'bet', 'turtle'];
+const SHARED = ['he']; // one copy for the whole tournament: play it in stage I or II
 const isUniqueRound = r => r.stage === 2 && !!cat(r.catId)?.unique;
 const cardOf = (r, pid) => DECK[r.stage]?.includes(r.r[pid]?.card) ? r.r[pid].card : null;
 const roundShort = r => r.stage === 1 ? `${r.lvl} ур.` : r.stage === 3 ? 'финал' : `${cat(r.catId)?.name || '?'}${cat(r.catId)?.unique ? ' · ' + pName(r.chooser) : ''}`;
 // round where this player already spent the card in this stage (other than `except`)
-const playedIn = (pid, stage, card, except) => S.rounds.find(r => r.stage === stage && r.id !== except && r.r[pid]?.card === card);
+const playedIn = (pid, stage, card, except) => S.rounds.find(r => (SHARED.includes(card) ? DECK[r.stage].includes(card) : r.stage === stage) && r.id !== except && r.r[pid]?.card === card);
 const cardsLeft = (pid, stage) => DECK[stage].filter(id => !playedIn(pid, stage, id)).length;
 // who is already the target of someone's card in this round
 const targetedBy = (r, tid, except) => S.players.find(o => o.id !== except && CARDS[cardOf(r, o.id)]?.target && r.r[o.id].tgt === tid);
@@ -687,7 +689,7 @@ function reportMD() {
       L(`| ${N(p.id)} | ${STAGE_NAME[r.stage]} · ${md(roundName(r))} | ${k.i} ${k.n}${x.tgt ? ' → ' + N(x.tgt) : ''} | ${csMark(x.cs) || '▶️'} ${x.mods.map(m => m.t).join(', ') || md(k.d)} | ${fmt(x.exp)} → **${fmt(x.pts)}** |`);
     }
     L('');
-    const left = S.players.map(p => `${N(p.id)} — ${cardsLeft(p.id, 1) + cardsLeft(p.id, 2)}`).join(' · ');
+    const left = S.players.map(p => `${N(p.id)} — ${cardsLeft(p.id, 1) + cardsLeft(p.id, 2) - SHARED.filter(id => !playedIn(p.id, 2, id)).length}`).join(' · ');
     L(`Несыгранных карт (сгорают по итогам ступени): ${left}`, '');
   }
 
@@ -900,7 +902,7 @@ function roundCard(r, R, T, title, extra = '') {
 function handsHTML(stage) {
   return `<div class="hands">${S.players.map(p => `
     <div class="hand armor"><div class="hn">${esc(p.name)} <span>🃏 ${cardsLeft(p.id, stage)}/${DECK[stage].length}</span></div>
-      <div class="hc">${DECK[stage].map(id => { const r = playedIn(p.id, stage, id); return `<span class="hcard ${r ? 'u' : ''}" title="${esc(CARDS[id].n + ': ' + CARDS[id].d + (r ? ' — сыграна: ' + roundShort(r) : ''))}">${CARDS[id].i}</span>`; }).join('')}</div>
+      <div class="hc">${DECK[stage].map(id => { const r = playedIn(p.id, stage, id); return `<span class="hcard ${r ? 'u' : ''} ${SHARED.includes(id) ? 'sh' : ''}" title="${esc(CARDS[id].n + ': ' + CARDS[id].d + (r ? ' — сыграна: ' + roundShort(r) : ''))}">${CARDS[id].i}</span>`; }).join('')}</div>
     </div>`).join('')}</div>`;
 }
 function deckHTML(stage) {
@@ -909,7 +911,7 @@ function deckHTML(stage) {
     <ul>
       <li>Карту объявляют <b>до боя</b>: нажми «🃏 Карта» у игрока. Одна карта на игрока за бой.</li>
       <li>Против одного игрока — не больше одной чужой карты за бой (Обмен, Дуэль, Выбор танка).</li>
-      <li>Неиспользованные карты ${stage === 1 ? 'I ступени сгорают и во II не переходят' : 'сгорают перед финалом'}.</li>
+      <li>Неиспользованные карты ${stage === 1 ? 'I ступени сгорают и во II не переходят' : 'сгорают перед финалом'}. Кроме 🧨 Только фугасы: она одна на весь турнир, её можно сыграть в I или во II ступени.</li>
       ${stage === 2 ? '<li>🔄 Обмен не работает с ✖️2 Удвоением — их нельзя сыграть в одном бою.</li><li>На уникальных боях (Арта, ЛТ) работают только Удвоение, Ставка и Черепаха.</li>' : ''}
       <li>Урон / блок / засвет / фраги вводятся всем, если кто-то сыграл такую карту. Ничья — бонус обоим.</li>
       <li>Порядок: обмен опытом → множитель уровня → бонусы карт → дуэли.</li>
