@@ -395,14 +395,14 @@ const CARDS = {
   pick:   {i: '🎯', n: 'Выбор танка',   d: 'выбираешь сопернику танк; если он всё равно первый — ×1.5', target: true},
 };
 const DECK = {
-  1: ['bet', 'turtle', 'dmg', 'frag', 'nav', 'he', 'duel'],
+  1: ['bet', 'turtle', 'dmg', 'frag', 'nav', 'duel'],
   2: ['double', 'bet', 'turtle', 'dmg', 'blk', 'spot', 'frag', 'nav', 'swap', 'duel', 'he', 'pick'],
   3: [],
 };
 const STAT = {dmg: {i: '💥', n: 'урон'}, blk: {i: '🛡️', n: 'блок'}, spot: {i: '🔦', n: 'засвет'}, frag: {i: '💀', n: 'фраги'}};
 const UNIQUE_OK = ['double', 'bet', 'turtle'];
 const isUniqueRound = r => r.stage === 2 && !!cat(r.catId)?.unique;
-const cardOf = (r, pid) => r.stage !== 3 && CARDS[r.r[pid]?.card] ? r.r[pid].card : null;
+const cardOf = (r, pid) => DECK[r.stage]?.includes(r.r[pid]?.card) ? r.r[pid].card : null;
 const roundShort = r => r.stage === 1 ? `${r.lvl} ур.` : r.stage === 3 ? 'финал' : `${cat(r.catId)?.name || '?'}${cat(r.catId)?.unique ? ' · ' + pName(r.chooser) : ''}`;
 // round where this player already spent the card in this stage (other than `except`)
 const playedIn = (pid, stage, card, except) => S.rounds.find(r => r.stage === stage && r.id !== except && r.r[pid]?.card === card);
@@ -925,7 +925,7 @@ function stage1HTML(R, T) {
   const rounds = S.rounds.filter(r => r.stage === 1).sort((a, b) => a.lvl - b.lvl);
   return `
     <h2>Первая ступень</h2>
-    <p class="rules">8 боёв — по одному на каждом уровне с 3 по 10, все на одном уровне. Очки = опыт × множитель уровня (3 ур — ×0.3 … 10 ур — ×1). У каждого игрока 7 карт на ступень.</p>
+    <p class="rules">8 боёв — по одному на каждом уровне с 3 по 10, все на одном уровне. Очки = опыт × множитель уровня (3 ур — ×0.3 … 10 ур — ×1). У каждого игрока ${DECK[1].length} карт на ступень.</p>
     ${deckHTML(1)}${handsHTML(1)}
     ${progressHTML(rounds)}
     <div class="rounds">
@@ -939,7 +939,7 @@ function stage2HTML(R, T) {
   const total = rounds.length;
   return `
     <h2>Вторая ступень</h2>
-    <p class="rules">${total} боёв, множитель уровня не работает. Общие категории: по очереди кто-то выбирает категорию и подбирает всем танки. Арта и ЛТ — уникальные: каждый обязан сыграть на них сам, остальным он подбирает танки того же уровня. Ставка на своём уникальном бою сравнивается с уникальными боями остальных. У каждого игрока 12 карт на ступень.</p>
+    <p class="rules">${total} боёв, множитель уровня не работает. Общие категории: по очереди кто-то выбирает категорию и подбирает всем танки. Арта и ЛТ — уникальные: каждый обязан сыграть на них сам, остальным он подбирает танки того же уровня. Ставка на своём уникальном бою сравнивается с уникальными боями остальных. У каждого игрока ${DECK[2].length} карт на ступень.</p>
     ${deckHTML(2)}${handsHTML(2)}
     <div class="cats">${S.categories.map(c => {
       const rs = rounds.filter(r => r.catId === c.id);
@@ -1074,7 +1074,7 @@ function setupHTML() {
       <label>Состав взвода</label>
       <div class="plist" id="plist">${(e ? S.players.map(p => p.name) : ['', '', '']).map((n, i) => playerInput(n, i)).join('')}</div>
       <button type="button" data-act="addPlayer">+ Добавить игрока</button>
-      <p class="rules">У каждого игрока колода карт: 7 на I ступень, 12 на II. В финале карт нет, всё ×${FINAL_X}.</p>
+      <p class="rules">У каждого игрока колода карт: ${DECK[1].length} на I ступень, ${DECK[2].length} на II. В финале карт нет, всё ×${FINAL_X}.</p>
       ${e ? `<p class="rules">Переименование сохраняет результаты — игроки сопоставляются по порядку.</p>` : ''}
       <div class="btns">
         <button class="primary" type="submit">${e ? 'Сохранить' : 'Создать турнир'}</button>
