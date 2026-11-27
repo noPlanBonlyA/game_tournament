@@ -247,6 +247,8 @@ body.first .round{animation:slidein .5s ease both}
 .xin input[type=number]{width:96px;padding:5px 8px}
 .cb{display:inline-block;font-size:12px;padding:0 8px;border-radius:99px;background:#2b2410;border:1px solid #5a4a1a;color:var(--gold);margin-right:4px}
 .cb.win{border-color:var(--win)} .cb.lose{border-color:var(--lose);opacity:.8} .cb.pending{border-color:var(--pend)}
+.heban{padding:8px 16px 8px 24px;font-size:13px;color:#ffb199;background:repeating-linear-gradient(-45deg,rgba(255,90,60,.16) 0 12px,rgba(255,90,60,.06) 12px 24px);border-bottom:1px solid #5a2a1a}
+.heban b{color:#ff7a4d}
 .cleft{font-size:13px;color:var(--gold);white-space:nowrap}
 .hands{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:12px 0 16px}
 .hand{padding:10px 14px 10px 22px}
@@ -389,7 +391,7 @@ const CARDS = {
   nav:    {i: '🧭', n: 'Штурман',       d: 'выбираешь, на какое направление едет весь взвод'},
   swap:   {i: '🔄', n: 'Обмен',         d: 'после боя меняешься опытом с соперником', target: true},
   duel:   {i: '⚔️', n: 'Дуэль',         d: 'у кого больше опыта — забирает 25% очков другого', target: true},
-  he:     {i: '🧨', n: 'Только фугасы', d: 'все едут только на фугасах, первый по опыту — ×1.5'},
+  he:     {i: '🧨', n: 'Только фугасы', d: 'на весь бой: все (и ты) едут только на фугасах, первый по опыту — ×1.5'},
   pick:   {i: '🎯', n: 'Выбор танка',   d: 'выбираешь сопернику танк; если он всё равно первый — ×1.5', target: true},
 };
 const DECK = {
@@ -858,13 +860,18 @@ function xrowHTML(r, p) {
 
 function isPlayed(r) { const f = needsOf(r); return S.players.every(p => num(cell(r, p.id).exp) != null && f.every(k => num(cell(r, p.id)[k]) != null)); }
 
+// "Только фугасы" — общая карта: действует на весь бой, на всех игроков
+function heBanner(r) {
+  const who = S.players.find(p => cardOf(r, p.id) === 'he');
+  return who ? `<div class="heban">🧨 <b>Весь бой — только фугасы!</b> <span class="muted">(карта: ${esc(who.name)})</span> На фугасах едут все, первый по опыту получает ×1.5.</div>` : '';
+}
 function roundCard(r, R, T, title, extra = '') {
   const c = r.stage === 2 ? cat(r.catId) : null;
   if (r.closed && isPlayed(r)) {
     const xs = S.players.map(p => ({p, x: R[r.id][p.id]})).sort((a, b) => b.x.pts - a.x.pts || b.x.exp - a.x.exp);
     return `
       <div class="round armor closed" data-card="${r.id}">
-        <div class="rhead"><h3>${title}</h3><span class="tag ok">✔ записан</span>${VIEW ? '' : `<button class="small ghost" data-open="${r.id}" title="Редактировать">✏️</button>`}</div>
+        <div class="rhead"><h3>${title}</h3><span class="tag ok">✔ записан</span>${VIEW ? '' : `<button class="small ghost" data-open="${r.id}" title="Редактировать">✏️</button>`}</div>${heBanner(r)}
         <div class="sum">${xs.map((o, i) => `
           <div class="sp ${i === 0 ? 'top' : ''}">
             <span class="m">${['🥇','🥈','🥉'][i] || i + 1}</span>
@@ -877,7 +884,7 @@ function roundCard(r, R, T, title, extra = '') {
   }
   return `
     <div class="round armor" data-card="${r.id}">
-      <div class="rhead"><h3>${title}</h3>${extra}</div>
+      <div class="rhead"><h3>${title}</h3>${extra}</div>${heBanner(r)}
       <div class="prow s2 head"><div>Игрок</div><div>Опыт</div><div>${r.stage === 3 ? '' : 'Карта'}</div><div class="pts">Очки</div></div>
       ${S.players.map(p => { const cl = cell(r, p.id); return `
         <div class="prow s2">
