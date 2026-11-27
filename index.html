@@ -389,7 +389,7 @@ const CARDS = {
   blk:    {i: '🛡️', n: 'Танкист',       d: 'больше всех заблокировал бронёй — +50%'},
   spot:   {i: '🔦', n: 'Светляк',       d: 'больше всех урона по засвету — +50%'},
   frag:   {i: '💀', n: 'Мясник',        d: 'больше всех фрагов — +50%'},
-  nav:    {i: '🧭', n: 'Штурман',       d: 'выбираешь, на какое направление едет весь взвод'},
+  nav:    {i: '🧭', n: 'Штурман',       d: 'выбираешь, на какое направление едет взвод; бой выигран — +50%'},
   swap:   {i: '🔄', n: 'Обмен',         d: 'после боя меняешься опытом с соперником', target: true},
   duel:   {i: '⚔️', n: 'Дуэль',         d: 'у кого больше опыта — забирает 25% очков другого', target: true},
   he:     {i: '🧨', n: 'Только фугасы', d: 'на весь бой: все (и ты) едут только на фугасах, первый по опыту — ×1.5. Одна на весь турнир — в I или во II ступени'},
@@ -508,7 +508,7 @@ function calcRound(r) {
   const maxE = known ? Math.max(...P.map(p => eff[p.id])) : null;
   const first = pid => known && eff[pid] >= maxE;
   const he = P.some(p => cardOf(r, p.id) === 'he');
-  const top = (pid, f) => { const vs = P.map(p => num(C[p.id][f])); return vs.some(v => v == null) ? null : num(C[pid][f]) >= Math.max(...vs); };
+  const top = (pid, f) => { const vs = P.map(p => num(C[p.id][f])); if (vs.some(v => v == null)) return null; const me = num(C[pid][f]); return P.every(p => p.id === pid || num(C[p.id][f]) < me); }; // tie = no bonus
   for (const p of P) {
     if (eff[p.id] == null) { res[p.id] = null; continue; }
     const k = cardOf(r, p.id), mods = [];
@@ -520,6 +520,7 @@ function calcRound(r) {
       status = cs = betStatus(r, p, eff);
       if (status === 'win') m('🎰 ×2', 'win', 2); else if (status === 'lose') m('🎰 ×0', 'lose', 0); else m('🎰 ⏳', 'pend');
     }
+    else if (k === 'nav') { cs = C[p.id].won ? 'win' : 'lose'; cs === 'win' ? m('🧭 победа +50%', 'win', 1.5) : m('🧭 бой не выигран', 'lose'); }
     else if (k === 'turtle') { cs = C[p.id].alive ? 'win' : 'lose'; cs === 'win' ? m('🐢 +50%', 'win', 1.5) : m('🐢 не выжил', 'lose'); }
     else if (STAT[k]) {
       const t = top(p.id, k); cs = t == null ? 'pending' : t ? 'win' : 'lose';
@@ -856,6 +857,7 @@ function pickerHTML(r, p) {
 function xrowHTML(r, p) {
   const c = cell(r, p.id), parts = [];
   for (const f of needsOf(r)) parts.push(`<label class="xin">${STAT[f].i} ${STAT[f].n}<input type="number" inputmode="numeric" value="${esc(c[f] ?? '')}" data-rid="${r.id}" data-pid="${p.id}" data-f="${f}" ${VIEW ? 'disabled' : ''}></label>`);
+  if (cardOf(r, p.id) === 'nav') parts.push(`<label class="bet"><input type="checkbox" data-rid="${r.id}" data-pid="${p.id}" data-f="won" ${c.won ? 'checked' : ''} ${VIEW ? 'disabled' : ''}> 🏆 бой выигран</label>`);
   if (cardOf(r, p.id) === 'turtle') parts.push(`<label class="bet"><input type="checkbox" data-rid="${r.id}" data-pid="${p.id}" data-f="alive" ${c.alive ? 'checked' : ''} ${VIEW ? 'disabled' : ''}> 🐢 выжил до конца</label>`);
   return parts.length ? `<div class="xrow">${parts.join('')}</div>` : '';
 }
@@ -913,7 +915,7 @@ function deckHTML(stage) {
       <li>Против одного игрока — не больше одной чужой карты за бой (Обмен, Дуэль, Выбор танка).</li>
       <li>Неиспользованные карты ${stage === 1 ? 'I ступени сгорают и во II не переходят' : 'сгорают перед финалом'}. Кроме 🧨 Только фугасы: она одна на весь турнир, её можно сыграть в I или во II ступени.</li>
       ${stage === 2 ? '<li>🔄 Обмен не работает с ✖️2 Удвоением — их нельзя сыграть в одном бою.</li><li>На уникальных боях (Арта, ЛТ) работают только Удвоение, Ставка и Черепаха.</li>' : ''}
-      <li>Урон / блок / засвет / фраги вводятся всем, если кто-то сыграл такую карту. Ничья — бонус обоим.</li>
+      <li>Урон / блок / засвет / фраги вводятся всем, если кто-то сыграл такую карту. Ничья — бонуса нет, нужно быть строго лучше всех.</li>
       <li>Порядок: обмен опытом → множитель уровня → бонусы карт → дуэли.</li>
     </ul></details>`;
 }
@@ -1116,7 +1118,7 @@ document.addEventListener('change', e => {
   if (t.id === 'importFile') return importFile(t);
   const r = S?.rounds.find(x => x.id === t.dataset.rid);
   if (!r) return;
-  if (t.dataset.f === 'alive') cell(r, t.dataset.pid).alive = t.checked;
+  if (t.dataset.f === 'alive' || t.dataset.f === 'won') cell(r, t.dataset.pid)[t.dataset.f] = t.checked;
   else if (t.dataset.rf) r[t.dataset.rf] = t.value;
   else return;
   save(); render();
