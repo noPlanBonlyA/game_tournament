@@ -223,6 +223,45 @@ body.first .round{animation:slidein .5s ease both}
   .radio{max-width:100%}
   .stamp{font-size:22px;right:12px}
 }
+/* cards */
+.prow.s2{grid-template-columns:minmax(110px,1.2fr) minmax(90px,1fr) minmax(140px,1.3fr) minmax(120px,1.2fr)}
+.cardbtn{border-style:dashed;color:var(--accent)}
+.cardbtn small{background:#3a3215;border-radius:99px;padding:0 6px;margin-left:4px;font-size:11px}
+.cardbtn.on{border-style:solid;border-color:var(--accent);background:#2b2410}
+.cardchip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:4px 6px 4px 10px;border-radius:8px;background:linear-gradient(180deg,#3d3315,#2b2410);border:1px solid #7a5f1a;color:var(--gold);box-shadow:0 2px 0 #000}
+.cardchip .x{padding:0 6px;font-size:11px;background:transparent;border:none;color:var(--muted)}
+.cardchip .x:hover{color:var(--lose)}
+.cardchip.flip{animation:cflip .6s ease}
+@keyframes cflip{0%{transform:perspective(400px) rotateY(90deg) scale(.8)}60%{transform:perspective(400px) rotateY(-10deg) scale(1.08)}100%{transform:none}}
+.picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:10px 16px 12px;background:rgba(0,0,0,.28);border-bottom:1px solid #262b20;animation:slidein .25s ease}
+.picker.tg{display:flex;flex-wrap:wrap;align-items:center}
+.pk-l{font-weight:600;color:var(--gold);margin-right:6px}
+.copt{display:grid;grid-template-columns:30px 1fr;grid-template-rows:auto auto;column-gap:6px;text-align:left;padding:8px 10px;border-radius:10px;background:linear-gradient(180deg,#2e2a17,#1e1c10);border-color:#5a4a1a}
+.copt:hover:not(:disabled){border-color:var(--gold);transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.5)}
+.copt .ci{grid-row:1/3;font-size:22px;align-self:center;text-align:center}
+.copt .cn{font-weight:700;font-size:14px;color:var(--gold)}
+.copt .cd{font-size:11px;color:var(--muted);line-height:1.25}
+.copt:disabled{opacity:.35;cursor:not-allowed}
+.xrow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:4px 16px 10px;border-bottom:1px solid #262b20;font-size:13px;color:var(--muted)}
+.xin{display:flex;align-items:center;gap:6px}
+.xin input[type=number]{width:96px;padding:5px 8px}
+.cb{display:inline-block;font-size:12px;padding:0 8px;border-radius:99px;background:#2b2410;border:1px solid #5a4a1a;color:var(--gold);margin-right:4px}
+.cb.win{border-color:var(--win)} .cb.lose{border-color:var(--lose);opacity:.8} .cb.pending{border-color:var(--pend)}
+.cleft{font-size:13px;color:var(--gold);white-space:nowrap}
+.hands{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:12px 0 16px}
+.hand{padding:10px 14px 10px 22px}
+.hand::before,.hand::after{display:none}
+.hand .hn{font-weight:700;display:flex;justify-content:space-between}
+.hand .hn span{color:var(--gold);font-size:13px;font-weight:600}
+.hc{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.hcard{width:30px;height:38px;display:grid;place-items:center;font-size:16px;border-radius:5px;background:linear-gradient(180deg,#3d3315,#241f0e);border:1px solid #7a5f1a;box-shadow:0 2px 0 #000;cursor:help}
+.hcard.u{opacity:.25;filter:grayscale(1);box-shadow:none;transform:scale(.9)}
+.deck{margin:10px 0;font-size:13px;background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.deck summary{cursor:pointer;font-weight:600;color:var(--gold)}
+.deck .dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:4px 16px;margin:10px 0}
+.deck .ci{display:inline-block;width:26px}
+.deck ul{margin:6px 0 2px;padding-left:20px;color:var(--muted)}
+
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 
 .sync{position:fixed;right:12px;bottom:12px;z-index:5;font-size:12px;padding:6px 12px;border-radius:99px;background:#1a1d15;border:1px solid var(--line);color:var(--muted);box-shadow:0 4px 12px rgba(0,0,0,.5)}
@@ -262,6 +301,7 @@ let S = null;        // state
 let VIEW = false;    // read-only viewer mode
 let TAB = 1;
 let EDITING = false; // setup form open for existing tournament
+let PICK = null;     // open card picker {rid, pid, card?} (UI only)
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -336,8 +376,51 @@ function pickLabel(r) {
   return l ? `${l} уровень (×${(l / 10).toFixed(1)})` : c ? c.name : 'тип не выбран';
 }
 const STAGE_NAME = {1: 'I', 2: 'II', 3: 'Финал'};
+
+/* ---------------- cards ---------------- */
+const CARDS = {
+  double: {i: '✖️2', n: 'Удвоение',     d: 'очки за бой ×2'},
+  bet:    {i: '🎰', n: 'Ставка',        d: 'первый по опыту — ×2, иначе ×0'},
+  turtle: {i: '🐢', n: 'Черепаха',      d: 'выжил до конца боя — +50%'},
+  dmg:    {i: '💥', n: 'Урон',          d: 'больше всех урона — +50%'},
+  blk:    {i: '🛡️', n: 'Танкист',       d: 'больше всех заблокировал бронёй — +50%'},
+  spot:   {i: '🔦', n: 'Светляк',       d: 'больше всех урона по засвету — +50%'},
+  frag:   {i: '💀', n: 'Мясник',        d: 'больше всех фрагов — +50%'},
+  nav:    {i: '🧭', n: 'Штурман',       d: 'выбираешь, на какое направление едет весь взвод'},
+  swap:   {i: '🔄', n: 'Обмен',         d: 'после боя меняешься опытом с соперником', target: true},
+  duel:   {i: '⚔️', n: 'Дуэль',         d: 'у кого больше опыта — забирает 25% очков другого', target: true},
+  he:     {i: '🧨', n: 'Только фугасы', d: 'все едут только на фугасах, первый по опыту — ×1.5'},
+  pick:   {i: '🎯', n: 'Выбор танка',   d: 'выбираешь сопернику танк; если он всё равно первый — ×1.5', target: true},
+};
+const DECK = {
+  1: ['bet', 'turtle', 'dmg', 'frag', 'nav', 'he', 'duel'],
+  2: ['double', 'bet', 'turtle', 'dmg', 'blk', 'spot', 'frag', 'nav', 'swap', 'duel', 'he', 'pick'],
+  3: [],
+};
+const STAT = {dmg: {i: '💥', n: 'урон'}, blk: {i: '🛡️', n: 'блок'}, spot: {i: '🔦', n: 'засвет'}, frag: {i: '💀', n: 'фраги'}};
+const UNIQUE_OK = ['double', 'bet', 'turtle'];
+const isUniqueRound = r => r.stage === 2 && !!cat(r.catId)?.unique;
+const cardOf = (r, pid) => r.stage !== 3 && CARDS[r.r[pid]?.card] ? r.r[pid].card : null;
+const roundShort = r => r.stage === 1 ? `${r.lvl} ур.` : r.stage === 3 ? 'финал' : `${cat(r.catId)?.name || '?'}${cat(r.catId)?.unique ? ' · ' + pName(r.chooser) : ''}`;
+// round where this player already spent the card in this stage (other than `except`)
+const playedIn = (pid, stage, card, except) => S.rounds.find(r => r.stage === stage && r.id !== except && r.r[pid]?.card === card);
+const cardsLeft = (pid, stage) => DECK[stage].filter(id => !playedIn(pid, stage, id)).length;
+// who is already the target of someone's card in this round
+const targetedBy = (r, tid, except) => S.players.find(o => o.id !== except && CARDS[cardOf(r, o.id)]?.target && r.r[o.id].tgt === tid);
+function availTargets(r, pid) { return S.players.filter(o => o.id !== pid && !targetedBy(r, o.id, pid)); }
+function whyNot(r, pid, id) {
+  if (playedIn(pid, r.stage, id, r.id)) return 'уже сыграна';
+  if (isUniqueRound(r) && !UNIQUE_OK.includes(id)) return 'не работает на уникальном бою';
+  const others = S.players.filter(o => o.id !== pid).map(o => cardOf(r, o.id));
+  if (id === 'swap' && others.includes('double')) return 'нельзя в бою с Удвоением';
+  if (id === 'double' && others.includes('swap')) return 'нельзя в бою с Обменом';
+  if (id === 'he' && others.includes('he')) return 'фугасы уже объявлены';
+  if (CARDS[id].target && !availTargets(r, pid).length) return 'все соперники уже под картой';
+  return '';
+}
+const needsOf = r => Object.keys(STAT).filter(f => S.players.some(p => cardOf(r, p.id) === f));
 const pName = id => S.players.find(p => p.id === id)?.name ?? '?';
-const cell = (r, pid) => (r.r[pid] ||= {exp:'', bet:false});
+const cell = (r, pid) => (r.r[pid] ||= {exp: ''});
 
 // stage 1 = one battle per level 3..10 (everyone on the same level)
 function ensureStage1(st) {
@@ -372,12 +455,18 @@ function ensureStage1(st) {
     r.chooser = p.id; r.slot = k; return r;
   });
   st.rounds = st.rounds.filter(r => r.stage === 1).concat(keep, finals);
+  // old format: bet checkbox -> "Ставка" card
+  for (const r of st.rounds) for (const c of Object.values(r.r || {})) {
+    if (c.bet && !c.card) c.card = 'bet';
+    delete c.bet;
+  }
   return st;
 }
 
 /* ---------------- scoring ---------------- */
-function betStatus(r, p) {
-  const me = num(cell(r, p.id).exp);
+// bet: "I'll be first by experience". eff = experience after swaps in this round
+function betStatus(r, p, eff) {
+  const me = eff[p.id];
   if (me == null) return 'pending';
   const others = S.players.filter(o => o.id !== p.id);
   const c = r.stage === 2 ? cat(r.catId) : null;
@@ -391,32 +480,80 @@ function betStatus(r, p) {
     }
   } else {
     for (const o of others) {
-      const v = num(r.r[o.id]?.exp);
-      if (v == null) return 'pending';
-      vals.push(v);
+      if (eff[o.id] == null) return 'pending';
+      vals.push(eff[o.id]);
     }
   }
   return !vals.length || me >= Math.max(...vals) ? 'win' : 'lose';
 }
 
+// order: swap (experience) -> level multiplier -> card bonuses -> duels (transfer of points)
+function calcRound(r) {
+  const P = S.players, res = {};
+  const mult = r.stage === 1 ? (r.lvl || 10) / 10 : r.stage === 3 ? (pickLvl(r) ? pickLvl(r) / 10 : 1) * FINAL_X : 1;
+  const C = Object.fromEntries(P.map(p => [p.id, cell(r, p.id)]));
+  const raw = Object.fromEntries(P.map(p => [p.id, num(C[p.id].exp)]));
+  const eff = {...raw}, swapped = {};
+  for (const p of P) {
+    const t = C[p.id].tgt;
+    if (cardOf(r, p.id) === 'swap' && t in eff && eff[p.id] != null && eff[t] != null) {
+      [eff[p.id], eff[t]] = [eff[t], eff[p.id]]; swapped[p.id] = t; swapped[t] = p.id;
+    }
+  }
+  const known = P.every(p => eff[p.id] != null);
+  const maxE = known ? Math.max(...P.map(p => eff[p.id])) : null;
+  const first = pid => known && eff[pid] >= maxE;
+  const he = P.some(p => cardOf(r, p.id) === 'he');
+  const top = (pid, f) => { const vs = P.map(p => num(C[p.id][f])); return vs.some(v => v == null) ? null : num(C[pid][f]) >= Math.max(...vs); };
+  for (const p of P) {
+    if (eff[p.id] == null) { res[p.id] = null; continue; }
+    const k = cardOf(r, p.id), mods = [];
+    let factor = 1, status = null, cs = k ? 'played' : null;
+    const m = (t, c, f = 1) => { mods.push({t, c}); factor *= f; };
+    if (swapped[p.id]) m(`🔄 опыт ${pName(swapped[p.id])}`, 'pend');
+    if (k === 'double') { m('✖️2 ×2', 'win', 2); cs = 'win'; }
+    else if (k === 'bet') {
+      status = cs = betStatus(r, p, eff);
+      if (status === 'win') m('🎰 ×2', 'win', 2); else if (status === 'lose') m('🎰 ×0', 'lose', 0); else m('🎰 ⏳', 'pend');
+    }
+    else if (k === 'turtle') { cs = C[p.id].alive ? 'win' : 'lose'; cs === 'win' ? m('🐢 +50%', 'win', 1.5) : m('🐢 не выжил', 'lose'); }
+    else if (STAT[k]) {
+      const t = top(p.id, k); cs = t == null ? 'pending' : t ? 'win' : 'lose';
+      t ? m(`${CARDS[k].i} +50%`, 'win', 1.5) : m(`${CARDS[k].i} ${t == null ? '⏳' : 'мимо'}`, t == null ? 'pend' : 'lose');
+    }
+    if (he && first(p.id)) m('🧨 ×1.5', 'win', 1.5);
+    if (P.some(o => cardOf(r, o.id) === 'pick' && C[o.id].tgt === p.id) && first(p.id)) m('🎯 ×1.5', 'win', 1.5);
+    const base = eff[p.id] * mult;
+    res[p.id] = {exp: raw[p.id], eff: eff[p.id], mult, base, mods, status, cs, card: k, tgt: k && CARDS[k].target ? C[p.id].tgt : null, factor, pts: base * factor};
+  }
+  // duels: whoever has more experience takes 25% of the other's points for the battle
+  const pre = Object.fromEntries(P.map(p => [p.id, res[p.id]?.pts ?? 0]));
+  for (const p of P) {
+    const a = res[p.id], t = C[p.id].tgt, b = res[t];
+    if (cardOf(r, p.id) !== 'duel' || !a || !(t in raw)) continue;
+    if (!b) { a.cs = 'pending'; a.mods.push({t: '⚔️ ⏳', c: 'pend'}); continue; }
+    if (a.eff === b.eff) { a.cs = 'played'; a.mods.push({t: '⚔️ ничья', c: 'pend'}); b.mods.push({t: '⚔️ ничья', c: 'pend'}); continue; }
+    const [w, l, lid] = a.eff > b.eff ? [a, b, t] : [b, a, p.id];
+    const tr = 0.25 * pre[lid];
+    w.pts += tr; l.pts -= tr;
+    w.mods.push({t: `⚔️ +${fmt(tr)}`, c: 'win'}); l.mods.push({t: `⚔️ −${fmt(tr)}`, c: 'lose'});
+    a.cs = a === w ? 'win' : 'lose';
+    a.duel = b.duel = {w: a === w ? p.id : t, l: lid, tr};
+  }
+  return res;
+}
+
 function compute() {
   const R = {}, T = {};
-  for (const p of S.players) T[p.id] = {s1:0, s2:0, s3:0, total:0, bets:{1:0, 2:0, 3:0}, battles:0};
+  for (const p of S.players) T[p.id] = {s1:0, s2:0, s3:0, total:0, used:{1:0, 2:0, 3:0}, battles:0};
   for (const r of S.rounds) {
-    R[r.id] = {};
+    R[r.id] = calcRound(r);
     for (const p of S.players) {
-      const c = cell(r, p.id);
-      if (c.bet) T[p.id].bets[r.stage]++;
-      const exp = num(c.exp);
-      if (exp == null) { R[r.id][p.id] = null; continue; }
-      const mult = r.stage === 1 ? (r.lvl || 10) / 10 : r.stage === 3 ? (pickLvl(r) ? pickLvl(r) / 10 : 1) * FINAL_X : 1;
-      const base = exp * mult;
-      let status = null, factor = 1;
-      if (c.bet) { status = betStatus(r, p); factor = status === 'win' ? 2 : status === 'lose' ? 0 : 1; }
-      const pts = base * factor;
-      R[r.id][p.id] = {exp, mult, base, status, factor, pts};
-      T[p.id]['s' + r.stage] += pts;
-      T[p.id].total += pts;
+      if (cardOf(r, p.id)) T[p.id].used[r.stage]++;
+      const x = R[r.id][p.id];
+      if (!x) continue;
+      T[p.id]['s' + r.stage] += x.pts;
+      T[p.id].total += x.pts;
       T[p.id].battles++;
     }
   }
@@ -444,7 +581,8 @@ function reportMD() {
   const s3 = S.rounds.filter(r => r.stage === 3);
   const played = r => S.players.some(p => R[r.id][p.id]);
   const roundName = r => r.stage === 1 ? `${r.lvl} ур.` : r.stage === 3 ? `${pickLabel(r)} (выбор ${pName(r.chooser)})` : `${cat(r.catId)?.name || '?'}${cat(r.catId)?.unique ? ' (' + pName(r.chooser) + ')' : ''}`;
-  const betMark = x => x?.status === 'win' ? ' 🎲✅' : x?.status === 'lose' ? ' 🎲❌' : x?.status === 'pending' ? ' 🎲⏳' : '';
+  const csMark = cs => cs === 'win' ? '✅' : cs === 'lose' ? '❌' : cs === 'pending' ? '⏳' : '';
+  const betMark = x => x?.card ? ` ${CARDS[x.card].i}${csMark(x.cs)}` : '';
   const out = [];
   const L = (...a) => out.push(...a);
 
@@ -462,10 +600,10 @@ function reportMD() {
   }
 
   // ----- standings
-  L(`## 🎖 Итоговая таблица`, '', `| Место | Танкист | I ступень | II ступень | Финал | Ставки | **Итого** |`, `|:---:|---|---:|---:|---:|:---:|---:|`);
+  L(`## 🎖 Итоговая таблица`, '', `| Место | Танкист | I ступень | II ступень | Финал | Карты | **Итого** |`, `|:---:|---|---:|---:|---:|:---:|---:|`);
   for (const {p, t, place} of list) {
-    const bets = S.rounds.flatMap(r => R[r.id][p.id]?.status ? [R[r.id][p.id].status] : []);
-    const bs = bets.length ? bets.map(b => b === 'win' ? '✅' : b === 'lose' ? '❌' : '⏳').join(' ') : '—';
+    const played = S.rounds.flatMap(r => R[r.id][p.id]?.card ? [R[r.id][p.id]] : []);
+    const bs = played.length ? played.map(x => CARDS[x.card].i + csMark(x.cs)).join(' ') : '—';
     L(`| ${medal(place)} | **${N(p.id)}** | ${fmt(t.s1)} | ${fmt(t.s2)} | ${fmt(t.s3)} | ${bs} | **${fmt(t.total)}** |`);
   }
   L('');
@@ -533,9 +671,22 @@ function reportMD() {
   if (bets.length) {
     const won = bets.filter(b => b.x.status === 'win'), lost = bets.filter(b => b.x.status === 'lose');
     L(`## 🎲 Ставки «буду первым»`, '', `Сыграло **${won.length}** из ${bets.length}. Выигрыш удваивает очки за бой, проигрыш обнуляет.`, '');
-    L(`| Танкист | Бой | Опыт | Результат | Очки |`, `|---|---|---:|:---:|---:|`);
-    for (const {r, p, x} of bets) L(`| ${N(p.id)} | ${md(roundName(r))} | ${fmt(x.exp)} | ${x.status === 'win' ? '✅ ×2' : x.status === 'lose' ? '❌ ×0' : '⏳'} | ${x.status === 'win' ? '+' + fmt(x.base) : x.status === 'lose' ? '−' + fmt(x.base) : fmt(x.pts)} |`);
+  }
+
+  // ----- cards
+  const plays = [];
+  for (const r of [...s1, ...s2]) for (const p of S.players) { const x = R[r.id][p.id]; if (x?.card) plays.push({r, p, x}); }
+  if (plays.length) {
+    const ok = plays.filter(a => a.x.cs === 'win').length, bad = plays.filter(a => a.x.cs === 'lose').length;
+    L(`## 🃏 Розыгрыш карт`, '', `Сыграно карт: **${plays.length}** · сработали: **${ok}** · мимо: **${bad}**.`, '');
+    L(`| Танкист | Бой | Карта | Итог | Опыт → очки |`, `|---|---|---|---|---:|`);
+    for (const {r, p, x} of plays) {
+      const k = CARDS[x.card];
+      L(`| ${N(p.id)} | ${STAGE_NAME[r.stage]} · ${md(roundName(r))} | ${k.i} ${k.n}${x.tgt ? ' → ' + N(x.tgt) : ''} | ${csMark(x.cs) || '▶️'} ${x.mods.map(m => m.t).join(', ') || md(k.d)} | ${fmt(x.exp)} → **${fmt(x.pts)}** |`);
+    }
     L('');
+    const left = S.players.map(p => `${N(p.id)} — ${cardsLeft(p.id, 1) + cardsLeft(p.id, 2)}`).join(' · ');
+    L(`Несыгранных карт (сгорают по итогам ступени): ${left}`, '');
   }
 
   // ----- highlights
@@ -563,7 +714,7 @@ function reportMD() {
     L(`- 📊 **Лучший средний опыт:** ${N(ac.p.id)} — ${fmt(ac.v)} за бой`, '');
   }
 
-  L(`---`, '', `*Отчёт сгенерирован ${new Date().toLocaleString('ru-RU')} · Правила: I ступень — опыт × уровень/10, ставок ${S.betLimits[1]}; II ступень — чистый опыт, ставок ${S.betLimits[2]}; финал — бой на выбор ×${FINAL_X}, без ставок.*`, '');
+  L(`---`, '', `*Отчёт сгенерирован ${new Date().toLocaleString('ru-RU')} · Правила: I ступень — опыт × уровень/10, ${DECK[1].length} карт; II ступень — чистый опыт, ${DECK[2].length} карт; финал — бой на выбор ×${FINAL_X}, без карт.*`, '');
   return out.join('\n');
 }
 
@@ -631,8 +782,9 @@ function ranked(T) {
   return sorted.map((p, i) => { const t = T[p.id]; if (t.total !== prev) { place = i + 1; prev = t.total; } return {p, t, place}; });
 }
 
-function dots(used, lim) {
-  return `<span class="betdots" title="Ставок использовано: ${used} из ${lim}">${Array.from({length: lim}, (_, i) => `<i class="${i < lim - used ? '' : 'u'}"></i>`).join('')}</span>`;
+function leftHTML(pid) {
+  const a = cardsLeft(pid, 1), b = cardsLeft(pid, 2);
+  return `<span class="cleft" title="Карт осталось: I ступень — ${a} из ${DECK[1].length}, II ступень — ${b} из ${DECK[2].length}">🃏 ${a} · ${b}</span>`;
 }
 
 function boardHTML(T) {
@@ -651,7 +803,7 @@ function boardHTML(T) {
       </div>` : '<div></div>').join('')}</div>` : '';
   const tt = titles(T);
   return podium + `<div class="ltable armor">
-    <div class="lt-row head"><div>#</div><div>Танкист</div><div class="num hide-m">I ступень</div><div class="num hide-m">II ступень</div><div class="num hide-m">Финал</div><div class="num hide-m">Ставки</div><div class="num">Итого</div></div>
+    <div class="lt-row head"><div>#</div><div>Танкист</div><div class="num hide-m">I ступень</div><div class="num hide-m">II ступень</div><div class="num hide-m">Финал</div><div class="num hide-m">Карты I · II</div><div class="num">Итого</div></div>
     ${list.map(({p, t, place}) => `
       <div class="lt-row r${place}" data-pid="${p.id}">
         <div class="rk">${place}</div>
@@ -659,33 +811,52 @@ function boardHTML(T) {
         <div class="num hide-m">${fmt(t.s1)}</div>
         <div class="num hide-m">${fmt(t.s2)}</div>
         <div class="num hide-m">${fmt(t.s3)}</div>
-        <div class="num hide-m">${dots(t.bets[1], S.betLimits[1])} ${dots(t.bets[2], S.betLimits[2])}</div>
+        <div class="num hide-m">${leftHTML(p.id)}</div>
         <div class="tot" data-count="${p.id}" data-v="${t.total}">${fmt(t.total)}</div>
       </div>`).join('')}
   </div>`;
 }
 
+function modsHTML(x) { return x.mods.map(m => ` <span class="${m.c}">${m.t}</span>`).join(''); }
 function ptsHTML(x, stage) {
   if (!x) return '<span class="muted">—</span>';
+  const lm = stage === 3 ? x.mult / FINAL_X : x.mult;
   let calc = '';
-  if (stage === 3) { const lm = x.mult / FINAL_X; calc = `${fmt(x.exp)}${lm !== 1 ? ' × ' + lm.toFixed(1) : ''} × ${FINAL_X} 🔥`; }
-  else if (x.mult !== 1) calc = `${fmt(x.exp)} × ${x.mult.toFixed(1)}`;
-  let st = '';
-  if (x.status === 'win') st = `<span class="win"> ×2 ✅</span>`;
-  if (x.status === 'lose') st = `<span class="lose"> ×0 ❌</span>`;
-  if (x.status === 'pending') st = `<span class="pend"> ставка ⏳</span>`;
-  return `<b>${fmt(x.pts)}</b><span class="calc">${calc}${st}</span>`;
+  if (lm !== 1) calc += ' × ' + lm.toFixed(1);
+  if (stage === 3) calc += ` × ${FINAL_X} 🔥`;
+  if (calc || x.mods.length) calc = fmt(x.eff) + calc;
+  return `<b>${fmt(x.pts)}</b><span class="calc">${calc}${modsHTML(x)}</span>`;
 }
 
-function betHTML(r, p, T) {
-  if (r.stage === 3) return '<span class="muted" style="font-size:12px">без ставок</span>';
-  const c = cell(r, p.id);
-  const lim = S.betLimits[r.stage];
-  const off = VIEW || (!c.bet && T[p.id].bets[r.stage] >= lim);
-  return `<label class="bet ${off && !c.bet ? 'off' : ''}"><input type="checkbox" data-rid="${r.id}" data-pid="${p.id}" data-f="bet" ${c.bet?'checked':''} ${off?'disabled':''}> Ставка</label>`;
+function cardName(id, tgt) { const k = CARDS[id]; return `${k.i} ${k.n}${tgt ? ' → ' + esc(pName(tgt)) : ''}`; }
+function cardSlot(r, p) {
+  if (r.stage === 3) return '<span class="muted" style="font-size:12px">без карт</span>';
+  const c = cell(r, p.id), k = cardOf(r, p.id);
+  if (k) return `<span class="cardchip" title="${esc(CARDS[k].d)}">${cardName(k, CARDS[k].target && c.tgt)}${VIEW ? '' : `<button class="x" data-unplay="${r.id}:${p.id}" title="Убрать карту">✕</button>`}</span>`;
+  if (VIEW) return '<span class="muted" style="font-size:12px">—</span>';
+  const open = PICK?.rid === r.id && PICK?.pid === p.id;
+  const left = DECK[r.stage].filter(id => !whyNot(r, p.id, id)).length;
+  return `<button class="small cardbtn ${open ? 'on' : ''}" data-pick="${r.id}:${p.id}" ${left || open ? '' : 'disabled'}>🃏 Карта <small>${left}</small></button>`;
+}
+function pickerHTML(r, p) {
+  if (VIEW || PICK?.rid !== r.id || PICK?.pid !== p.id) return '';
+  if (PICK.card) {
+    const k = CARDS[PICK.card];
+    return `<div class="picker tg"><span class="pk-l">${k.i} ${k.n} — против кого?</span>${availTargets(r, p.id).map(o => `<button class="small" data-tgt="${o.id}">${esc(o.name)}</button>`).join('')}<button class="small ghost" data-pickback>← назад</button></div>`;
+  }
+  const ids = DECK[r.stage].filter(id => !playedIn(p.id, r.stage, id, r.id));
+  return `<div class="picker">${ids.map(id => { const why = whyNot(r, p.id, id), k = CARDS[id]; return `
+    <button class="copt" data-play="${id}" ${why ? 'disabled' : ''} title="${esc(why || k.d)}"><span class="ci">${k.i}</span><span class="cn">${k.n}</span><span class="cd">${why || k.d}</span></button>`; }).join('')}
+    ${ids.length ? '' : '<span class="muted">Все карты ступени уже сыграны</span>'}</div>`;
+}
+function xrowHTML(r, p) {
+  const c = cell(r, p.id), parts = [];
+  for (const f of needsOf(r)) parts.push(`<label class="xin">${STAT[f].i} ${STAT[f].n}<input type="number" inputmode="numeric" value="${esc(c[f] ?? '')}" data-rid="${r.id}" data-pid="${p.id}" data-f="${f}" ${VIEW ? 'disabled' : ''}></label>`);
+  if (cardOf(r, p.id) === 'turtle') parts.push(`<label class="bet"><input type="checkbox" data-rid="${r.id}" data-pid="${p.id}" data-f="alive" ${c.alive ? 'checked' : ''} ${VIEW ? 'disabled' : ''}> 🐢 выжил до конца</label>`);
+  return parts.length ? `<div class="xrow">${parts.join('')}</div>` : '';
 }
 
-function isPlayed(r) { return S.players.every(p => num(cell(r, p.id).exp) != null); }
+function isPlayed(r) { const f = needsOf(r); return S.players.every(p => num(cell(r, p.id).exp) != null && f.every(k => num(cell(r, p.id)[k]) != null)); }
 
 function roundCard(r, R, T, title, extra = '') {
   const c = r.stage === 2 ? cat(r.catId) : null;
@@ -698,7 +869,7 @@ function roundCard(r, R, T, title, extra = '') {
           <div class="sp ${i === 0 ? 'top' : ''}">
             <span class="m">${['🥇','🥈','🥉'][i] || i + 1}</span>
             <span class="n">${esc(o.p.name)}${o.p.id === r.chooser && c?.unique ? ` <small>(на ${esc(c.name)})</small>` : ''}</span>
-            <span class="e">${fmt(o.x.exp)} опыта${o.x.status === 'win' ? ' <span class="win">🎲 ×2</span>' : o.x.status === 'lose' ? ' <span class="lose">🎲 ×0</span>' : o.x.status === 'pending' ? ' <span class="pend">🎲 ⏳</span>' : ''}</span>
+            <span class="e">${o.x.card ? `<span class="cb ${o.x.cs}">${cardName(o.x.card, o.x.tgt)}</span> ` : ''}${fmt(o.x.exp)} опыта${modsHTML(o.x)}</span>
             <b>${fmt(o.x.pts)}</b>
           </div>`).join('')}</div>
         <div class="quip">💬 ${quip(r, R)}</div>
@@ -707,16 +878,35 @@ function roundCard(r, R, T, title, extra = '') {
   return `
     <div class="round armor" data-card="${r.id}">
       <div class="rhead"><h3>${title}</h3>${extra}</div>
-      <div class="prow s2 head"><div>Игрок</div><div>Опыт</div><div></div><div class="pts">Очки</div></div>
+      <div class="prow s2 head"><div>Игрок</div><div>Опыт</div><div>${r.stage === 3 ? '' : 'Карта'}</div><div class="pts">Очки</div></div>
       ${S.players.map(p => { const cl = cell(r, p.id); return `
         <div class="prow s2">
           <div class="pname">${esc(p.name)}${(c || r.stage === 3) && p.id === r.chooser ? `<span class="tag">${c?.unique ? 'на ' + esc(c.name) : 'выбирал'}</span>` : ''}</div>
           <input type="number" inputmode="numeric" placeholder="опыт" value="${esc(cl.exp)}" data-rid="${r.id}" data-pid="${p.id}" data-f="exp" ${VIEW?'disabled':''}>
-          ${betHTML(r, p, T)}
+          <div class="cslot">${cardSlot(r, p)}</div>
           <div class="pts" data-out="${r.id}:${p.id}">${ptsHTML(R[r.id][p.id], r.stage)}</div>
-        </div>`; }).join('')}
-      ${VIEW ? '' : `<div class="rfoot"><span class="muted hint">Enter — следующее поле</span><button class="primary small" data-record="${r.id}" ${isPlayed(r) ? '' : 'disabled'}>✅ Записать бой</button></div>`}
+        </div>${xrowHTML(r, p)}${pickerHTML(r, p)}`; }).join('')}
+      ${VIEW ? '' : `<div class="rfoot"><span class="muted hint">${r.stage === 3 ? '' : 'Карту объявляют до боя · '}Enter — следующее поле</span><button class="primary small" data-record="${r.id}" ${isPlayed(r) ? '' : 'disabled'}>✅ Записать бой</button></div>`}
     </div>`;
+}
+
+function handsHTML(stage) {
+  return `<div class="hands">${S.players.map(p => `
+    <div class="hand armor"><div class="hn">${esc(p.name)} <span>🃏 ${cardsLeft(p.id, stage)}/${DECK[stage].length}</span></div>
+      <div class="hc">${DECK[stage].map(id => { const r = playedIn(p.id, stage, id); return `<span class="hcard ${r ? 'u' : ''}" title="${esc(CARDS[id].n + ': ' + CARDS[id].d + (r ? ' — сыграна: ' + roundShort(r) : ''))}">${CARDS[id].i}</span>`; }).join('')}</div>
+    </div>`).join('')}</div>`;
+}
+function deckHTML(stage) {
+  return `<details class="deck"><summary>🃏 Карты ступени — по ${DECK[stage].length} у каждого. Как работают</summary>
+    <div class="dl">${DECK[stage].map(id => `<div><span class="ci">${CARDS[id].i}</span><b>${CARDS[id].n}</b> — ${CARDS[id].d}</div>`).join('')}</div>
+    <ul>
+      <li>Карту объявляют <b>до боя</b>: нажми «🃏 Карта» у игрока. Одна карта на игрока за бой.</li>
+      <li>Против одного игрока — не больше одной чужой карты за бой (Обмен, Дуэль, Выбор танка).</li>
+      <li>Неиспользованные карты ${stage === 1 ? 'I ступени сгорают и во II не переходят' : 'сгорают перед финалом'}.</li>
+      ${stage === 2 ? '<li>🔄 Обмен не работает с ✖️2 Удвоением — их нельзя сыграть в одном бою.</li><li>На уникальных боях (Арта, ЛТ) работают только Удвоение, Ставка и Черепаха.</li>' : ''}
+      <li>Урон / блок / засвет / фраги вводятся всем, если кто-то сыграл такую карту. Ничья — бонус обоим.</li>
+      <li>Порядок: обмен опытом → множитель уровня → бонусы карт → дуэли.</li>
+    </ul></details>`;
 }
 
 function progressHTML(rounds) {
@@ -728,7 +918,8 @@ function stage1HTML(R, T) {
   const rounds = S.rounds.filter(r => r.stage === 1).sort((a, b) => a.lvl - b.lvl);
   return `
     <h2>Первая ступень</h2>
-    <p class="rules">8 боёв — по одному на каждом уровне с 3 по 10, все на одном уровне. Очки = опыт × множитель уровня (3 ур — ×0.3 … 10 ур — ×1). Ставка «буду первым по опыту»: победа — ×2, поражение — ×0. Ставок на ступень: ${S.betLimits[1]}.</p>
+    <p class="rules">8 боёв — по одному на каждом уровне с 3 по 10, все на одном уровне. Очки = опыт × множитель уровня (3 ур — ×0.3 … 10 ур — ×1). У каждого игрока 7 карт на ступень.</p>
+    ${deckHTML(1)}${handsHTML(1)}
     ${progressHTML(rounds)}
     <div class="rounds">
       ${rounds.map(r => roundCard(r, R, T, `${r.lvl} уровень <span class="tag">×${(r.lvl / 10).toFixed(1)}</span>`)).join('')}
@@ -741,7 +932,8 @@ function stage2HTML(R, T) {
   const total = rounds.length;
   return `
     <h2>Вторая ступень</h2>
-    <p class="rules">${total} боёв, множитель уровня не работает. Общие категории: по очереди кто-то выбирает категорию и подбирает всем танки. Арта и ЛТ — уникальные: каждый обязан сыграть на них сам, остальным он подбирает танки того же уровня. Ставка на своём уникальном бою сравнивается с уникальными боями остальных. Ставок на ступень: ${S.betLimits[2]}.</p>
+    <p class="rules">${total} боёв, множитель уровня не работает. Общие категории: по очереди кто-то выбирает категорию и подбирает всем танки. Арта и ЛТ — уникальные: каждый обязан сыграть на них сам, остальным он подбирает танки того же уровня. Ставка на своём уникальном бою сравнивается с уникальными боями остальных. У каждого игрока 12 карт на ступень.</p>
+    ${deckHTML(2)}${handsHTML(2)}
     <div class="cats">${S.categories.map(c => {
       const rs = rounds.filter(r => r.catId === c.id);
       const pl = rs.filter(isPlayed);
@@ -766,7 +958,7 @@ function stage3HTML(R, T) {
   const rounds = S.rounds.filter(r => r.stage === 3);
   return `
     <h2>🔥 Экстра-финал · ×${FINAL_X} всем</h2>
-    <p class="rules">${rounds.length} боя — по одному на каждого игрока. Игрок выбирает любой тип боя из любой ступени: уровень из I ступени (с множителем уровня) или класс из II ступени (без множителя). <b>Все очки в финале ×${FINAL_X}.</b> Ставок в финале нет.</p>
+    <p class="rules">${rounds.length} боя — по одному на каждого игрока. Игрок выбирает любой тип боя из любой ступени: уровень из I ступени (с множителем уровня) или класс из II ступени (без множителя). <b>Все очки в финале ×${FINAL_X}.</b> Карт в финале нет — чистый скилл.</p>
     ${progressHTML(rounds)}
     <div class="rounds">
       ${rounds.map((r, i) => {
@@ -794,6 +986,11 @@ function quip(r, R) {
   const c = r.stage === 2 ? cat(r.catId) : r.stage === 3 ? pickCat(r) : null;
   const out = [];
   if (r.stage === 3) { const ch = xs.find(o => o.p.id === r.chooser) || best; out.push(pick([`Финальный выбор ${n(ch)}: ${esc(pickLabel(r))}. Ставки сделаны, господа 🎬`, `Финал: «${esc(pickLabel(r))}» по заявке ${n(ch)} — всё ×2 🔥`])); }
+  const duel = xs.find(o => o.x.card === 'duel' && o.x.duel);
+  if (duel) { const d = duel.x.duel, w = xs.find(o => o.p.id === d.w), l = xs.find(o => o.p.id === d.l); out.push(pick([`⚔️ Дуэль за ${n(w)}: ${n(l)} отдаёт ${fmt(d.tr)} очков`, `⚔️ ${n(w)} выигрывает дуэль, ${n(l)} платит четвертью очков`])); }
+  const sw = xs.find(o => o.x.card === 'swap' && o.x.tgt);
+  if (sw) { const o = xs.find(q => q.p.id === sw.x.tgt); if (o) out.push(sw.x.eff > sw.x.exp ? `🔄 Обмен сработал: ${n(sw)} забирает опыт ${n(o)} — гениально или подло?` : `🔄 Обмен вышел боком: ${n(sw)} отдал свои ${fmt(sw.x.exp)} опыта ${n(o)} 🤦`); }
+  if (xs.some(o => o.x.card === 'he')) out.push(pick([`🧨 Только фугасы! Броня плакала, модули горели`, `🧨 Фугасный бой: кто пробил — тот молодец, кто нет — тот «сплешил»`]));
   const win = xs.find(o => o.x.status === 'win'), lose = xs.find(o => o.x.status === 'lose');
   if (win) out.push(pick([`Ставка ${n(win)} зашла — ×2! Казино на гусеницах 🎰`, `${n(win)}: ва-банк удался, очки удвоены 💰`, `${n(win)} знает толк в ставках. ×2 и заслуженно 🎲`]));
   if (lose) out.push(pick([`Ставка ${n(lose)} — рикошет прямо в кошелёк. ×0 💸`, `${n(lose)}: «я буду первым» — сказано громко, сыграно тихо 🤫`, `Минус ${fmt(lose.x.base)} очков для ${n(lose)}. Казино всегда побеждает 🎲`]));
@@ -870,10 +1067,7 @@ function setupHTML() {
       <label>Состав взвода</label>
       <div class="plist" id="plist">${(e ? S.players.map(p => p.name) : ['', '', '']).map((n, i) => playerInput(n, i)).join('')}</div>
       <button type="button" data-act="addPlayer">+ Добавить игрока</button>
-      <div class="row2">
-        <label>Ставок в I ступени<input name="b1" type="number" min="0" value="${e ? S.betLimits[1] : 1}"></label>
-        <label>Ставок во II ступени<input name="b2" type="number" min="0" value="${e ? S.betLimits[2] : 2}"></label>
-      </div>
+      <p class="rules">У каждого игрока колода карт: 7 на I ступень, 12 на II. В финале карт нет, всё ×${FINAL_X}.</p>
       ${e ? `<p class="rules">Переименование сохраняет результаты — игроки сопоставляются по порядку.</p>` : ''}
       <div class="btns">
         <button class="primary" type="submit">${e ? 'Сохранить' : 'Создать турнир'}</button>
@@ -901,9 +1095,9 @@ function refresh() {
 /* ---------------- events ---------------- */
 document.addEventListener('input', e => {
   const t = e.target;
-  if (VIEW || t.dataset.f !== 'exp') return;
+  if (VIEW || !['exp', ...Object.keys(STAT)].includes(t.dataset.f)) return;
   const r = S.rounds.find(x => x.id === t.dataset.rid);
-  cell(r, t.dataset.pid).exp = t.value;
+  cell(r, t.dataset.pid)[t.dataset.f] = t.value;
   save(); refresh();
 });
 
@@ -913,7 +1107,7 @@ document.addEventListener('change', e => {
   if (t.id === 'importFile') return importFile(t);
   const r = S?.rounds.find(x => x.id === t.dataset.rid);
   if (!r) return;
-  if (t.dataset.f === 'bet') cell(r, t.dataset.pid).bet = t.checked;
+  if (t.dataset.f === 'alive') cell(r, t.dataset.pid).alive = t.checked;
   else if (t.dataset.rf) r[t.dataset.rf] = t.value;
   else return;
   save(); render();
@@ -924,7 +1118,7 @@ document.addEventListener('submit', e => {
   const f = new FormData(e.target);
   const names = f.getAll('player').map(s => s.trim()).filter(Boolean);
   if (!names.length) return;
-  const limits = {1: Math.max(0, +f.get('b1') || 0), 2: Math.max(0, +f.get('b2') || 0), 3: 0};
+  const limits = {1: 0, 2: 0, 3: 0}; // bets are cards now
   if (S && EDITING) {
     const old = S.players;
     S.players = names.map((n, i) => ({id: old[i]?.id || uid(), name: n}));
@@ -940,7 +1134,7 @@ document.addEventListener('submit', e => {
 });
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-act],[data-tab],[data-del],[data-record],[data-open]');
+  const t = e.target.closest('[data-act],[data-tab],[data-del],[data-record],[data-open],[data-pick],[data-play],[data-tgt],[data-pickback],[data-unplay]');
   if (!t) return;
   if (t.dataset.act === 'fire') return fire(t);
   if (t.dataset.tab) { TAB = +t.dataset.tab; return render(); }
@@ -952,6 +1146,27 @@ document.addEventListener('click', e => {
   if (t.dataset.act === 'report') return download(reportMD(), (S.name || 'turnir') + ' — отчёт.md', 'text/markdown');
   if (VIEW) return;
   if (t.dataset.record) return recordRound(t.dataset.record);
+  if (t.dataset.pick) {
+    const [rid, pid] = t.dataset.pick.split(':');
+    PICK = PICK?.rid === rid && PICK?.pid === pid ? null : {rid, pid}; return render();
+  }
+  if (t.dataset.pickback != null) { PICK.card = null; return render(); }
+  if (t.dataset.play || t.dataset.tgt) {
+    const r = S.rounds.find(x => x.id === PICK?.rid); if (!r) return;
+    const id = t.dataset.play || PICK.card;
+    if (t.dataset.play && CARDS[id].target) { PICK.card = id; return render(); }
+    const c = cell(r, PICK.pid);
+    c.card = id; c.tgt = t.dataset.tgt || null;
+    const pid = PICK.pid; PICK = null; save(); render();
+    toast(`${pName(pid)} играет карту ${CARDS[id].i} ${CARDS[id].n}${c.tgt ? ' против ' + pName(c.tgt) : ''}!`);
+    cardFx(r.id, pid);
+    return;
+  }
+  if (t.dataset.unplay) {
+    const [rid, pid] = t.dataset.unplay.split(':');
+    const c = cell(S.rounds.find(x => x.id === rid), pid);
+    delete c.card; delete c.tgt; save(); return render();
+  }
   if (t.dataset.open) {
     const r = S.rounds.find(x => x.id === t.dataset.open); r.closed = false; save(); render();
     document.querySelector(`[data-card="${r.id}"] input[data-f="exp"]`)?.focus();
@@ -999,10 +1214,10 @@ function recordRound(id) {
 
 document.addEventListener('keydown', e => {
   const t = e.target;
-  if (e.key !== 'Enter' || t.dataset?.f !== 'exp' || VIEW) return;
+  if (e.key !== 'Enter' || !['exp', ...Object.keys(STAT)].includes(t.dataset?.f) || VIEW) return;
   e.preventDefault();
   const card = t.closest('.round');
-  const ins = [...card.querySelectorAll('input[data-f="exp"]')];
+  const ins = [...card.querySelectorAll('input[type=number][data-f]')];
   const i = ins.indexOf(t);
   if (i < ins.length - 1) { ins[i + 1].focus(); ins[i + 1].select(); }
   else recordRound(t.dataset.rid);
@@ -1071,8 +1286,17 @@ function stampCard(id, R) {
   card.classList.add('just');
   setTimeout(() => { card.querySelector('.stamp')?.remove(); card.classList.remove('just'); }, 1800);
   const res = Object.values(R[id] || {});
-  if (res.some(x => x?.status === 'win')) setTimeout(() => confetti(card), 350);
+  if (res.some(x => x?.status === 'win' || (x?.card === 'duel' && x.cs === 'win'))) setTimeout(() => confetti(card), 350);
   if (res.some(x => x?.status === 'lose')) setTimeout(() => { card.classList.add('shake'); floaters(card, '💸'); setTimeout(() => card.classList.remove('shake'), 600); }, 350);
+}
+
+function cardFx(rid, pid) {
+  if (reduceMotion) return;
+  const el = document.querySelector(`[data-card="${rid}"] [data-unplay="${rid}:${pid}"]`)?.closest('.cardchip');
+  if (!el) return;
+  el.classList.add('flip');
+  const c = cell(S.rounds.find(x => x.id === rid), pid).card;
+  floaters(el, CARDS[c].i.slice(0, 2), 5);
 }
 
 function confetti(el, n = 60) {
