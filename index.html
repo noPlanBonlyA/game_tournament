@@ -401,9 +401,7 @@ const DECK = {
   3: [],
 };
 const STAT = {dmg: {i: '💥', n: 'урон'}, blk: {i: '🛡️', n: 'блок'}, spot: {i: '🔦', n: 'засвет'}, frag: {i: '💀', n: 'фраги'}};
-const UNIQUE_OK = ['double', 'bet', 'turtle'];
 const SHARED = ['he']; // one copy for the whole tournament: play it in stage I or II
-const isUniqueRound = r => r.stage === 2 && !!cat(r.catId)?.unique;
 const cardOf = (r, pid) => DECK[r.stage]?.includes(r.r[pid]?.card) ? r.r[pid].card : null;
 const roundShort = r => r.stage === 1 ? `${r.lvl} ур.` : r.stage === 3 ? 'финал' : `${cat(r.catId)?.name || '?'}${cat(r.catId)?.unique ? ' · ' + pName(r.chooser) : ''}`;
 // round where this player already spent the card in this stage (other than `except`)
@@ -414,7 +412,6 @@ const targetedBy = (r, tid, except) => S.players.find(o => o.id !== except && CA
 function availTargets(r, pid) { return S.players.filter(o => o.id !== pid && !targetedBy(r, o.id, pid)); }
 function whyNot(r, pid, id) {
   if (playedIn(pid, r.stage, id, r.id)) return 'уже сыграна';
-  if (isUniqueRound(r) && !UNIQUE_OK.includes(id)) return 'не работает на уникальном бою';
   const others = S.players.filter(o => o.id !== pid).map(o => cardOf(r, o.id));
   if (id === 'swap' && others.includes('double')) return 'нельзя в бою с Удвоением';
   if (id === 'double' && others.includes('swap')) return 'нельзя в бою с Обменом';
@@ -914,7 +911,7 @@ function deckHTML(stage) {
       <li>Карту объявляют <b>до боя</b>: нажми «🃏 Карта» у игрока. Одна карта на игрока за бой.</li>
       <li>Против одного игрока — не больше одной чужой карты за бой (Обмен, Дуэль, Выбор танка).</li>
       <li>Неиспользованные карты ${stage === 1 ? 'I ступени сгорают и во II не переходят' : 'сгорают перед финалом'}. Кроме 🧨 Только фугасы: она одна на весь турнир, её можно сыграть в I или во II ступени.</li>
-      ${stage === 2 ? '<li>🔄 Обмен не работает с ✖️2 Удвоением — их нельзя сыграть в одном бою.</li><li>На уникальных боях (Арта, ЛТ) работают только Удвоение, Ставка и Черепаха.</li>' : ''}
+      ${stage === 2 ? '<li>🔄 Обмен не работает с ✖️2 Удвоением — их нельзя сыграть в одном бою.</li><li>На уникальных боях (Арта, ЛТ) можно играть любые карты.</li>' : ''}
       <li>Урон / блок / засвет / фраги вводятся всем, если кто-то сыграл такую карту. Ничья — бонуса нет, нужно быть строго лучше всех.</li>
       <li>Порядок: обмен опытом → множитель уровня → бонусы карт → дуэли.</li>
     </ul></details>`;
